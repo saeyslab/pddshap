@@ -1,0 +1,31 @@
+[project]
+name = "pddshap"
+version = "0.1.0"
+description = "A Python package for approximation Shapley-based explanations using the partial dependence decomposition."
+readme = "README.md"
+authors = [
+    { name = "Arne Gevaert", email = "arne.gevaert@ugent.be" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "scipy",
+    "tqdm"
+]
+
+[dependency-groups]
+dev = [
+    "matplotlib",
+    "shap",
+    "seaborn",
+    "numba==0.63.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.21,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev"]
