@@ -1,6 +1,6 @@
 from typing import cast
-from pddshapley import PartialDependenceDecomposition
-from pddshapley.sampling import RandomSubsampleCollocation,\
+from pddshap import PartialDependenceDecomposition
+from pddshap.sampling import RandomSubsampleCollocation,\
       IndependentConditioningMethod, GaussianConditioningMethod,\
       KernelConditioningMethod
 from experiments.util import eval

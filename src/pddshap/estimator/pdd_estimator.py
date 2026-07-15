@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from numpy import typing as npt
 
-from pddshapley.signature import FeatureSubset
+from pddshap.signature import FeatureSubset
 from typing import Dict, List
 
 

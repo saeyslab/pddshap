@@ -1,9 +1,8 @@
-from pddshapley.estimator import EstimatorNotFittedException
-from pddshapley.estimator.pdd_estimator import PDDEstimator
-from pddshapley.signature import FeatureSubset
+from pddshap.estimator import EstimatorNotFittedException
+from pddshap.estimator.pdd_estimator import PDDEstimator
+from pddshap.signature import FeatureSubset
 from typing import Dict, List, Optional
 from numpy import typing as npt
-import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF
 

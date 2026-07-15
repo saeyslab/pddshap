@@ -3,9 +3,8 @@ from scipy import special
 import itertools
 from typing import Dict, Tuple, List, Union, Callable
 from numpy import typing as npt
-import pandas as pd
-from pddshapley.signature import FeatureSubset
-from pddshapley.util import Model
+from pddshap.signature import FeatureSubset
+from pddshap.util import Model
 
 
 class MultilinearPolynomial(Model):
@@ -88,7 +87,7 @@ class MultilinearPolynomial(Model):
 
 class RandomMultilinearPolynomial(MultilinearPolynomial):
     def __init__(self, num_features: int, num_terms: List[Union[int, float]],
-                 coefficient_generator: Callable[[], float] = None):
+                 coefficient_generator: Callable[[], float] | None = None):
         """
         Arguments:
             num_features: total amount of input features

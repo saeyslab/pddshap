@@ -1,5 +1,5 @@
-from pddshapley.variance import VarianceEstimator
-from pddshapley.signature import FeatureSubset
+from pddshap.variance import VarianceEstimator
+from pddshap.signature import FeatureSubset
 import numpy as np
 from experiments.synthetic.multilinear_polynomial import MultilinearPolynomial
 

@@ -3,8 +3,8 @@ from itertools import combinations
 import numpy as np
 from numpy import typing as npt
 
-from pddshapley.util.model import Model
-from pddshapley.signature import FeatureSubset
+from pddshap.util.model import Model
+from pddshap.signature import FeatureSubset
 
 
 class SobolNotAvailableException(Exception):

@@ -129,6 +129,7 @@ class PartialDependenceDecomposition:
         max_size: Optional[int] = None,
         feature_sets: Optional[List[FeatureSubset]] = None,
         kmeans: Optional[int] = None,
+        n_jobs: Optional[int] = 1,
     ) -> None:
         """
         Fit the partial dependence decomposition using a given
@@ -212,7 +213,7 @@ class PartialDependenceDecomposition:
         cur_subsets = [fs for fs in feature_sets if len(fs) == fs_size]
         while len(cur_subsets) > 0:
             print("Fitting components of size", fs_size, "...")
-            Parallel(n_jobs=-1)(
+            Parallel(n_jobs=n_jobs)(
                 delayed(self._fit_component)(
                     background_data, fs) for fs in tqdm(cur_subsets))
             fs_size += 1

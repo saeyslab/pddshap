@@ -1,5 +1,5 @@
-from pddshapley.estimator import PDDEstimator, EstimatorNotFittedException
-from pddshapley.signature import FeatureSubset
+from pddshap.estimator import PDDEstimator, EstimatorNotFittedException
+from pddshap.signature import FeatureSubset
 from numpy import typing as npt
 from typing import Optional, Dict, List
 from sklearn.ensemble import RandomForestRegressor

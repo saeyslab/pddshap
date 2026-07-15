@@ -2,7 +2,7 @@ import numpy as np
 from typing import Dict, Optional
 from numpy import typing as npt
 
-from pddshapley.signature import FeatureSubset
+from pddshap.signature import FeatureSubset
 
 
 class COETracker:

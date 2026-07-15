@@ -1,9 +1,9 @@
-from pddshapley.estimator import PDDEstimator
+from pddshap.estimator import PDDEstimator
 from numpy import typing as npt
 import numpy as np
 from typing import Dict, List
 
-from pddshapley.signature.feature_subset import FeatureSubset
+from pddshap.signature.feature_subset import FeatureSubset
 
 
 class ConstantPDDEstimator(PDDEstimator):
