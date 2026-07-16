@@ -9,7 +9,7 @@ class GradientBoostingPDDEstimator(PDDEstimator):
     def __init__(self, categories: Dict[int, List[int]],
                  feature_subset: FeatureSubset):
         super().__init__(categories, feature_subset)
-        self.forest: Optional[RandomForestRegressor] = None
+        self.forest: Optional[GradientBoostingRegressor] = None
 
     def fit(self, collocation_points: npt.NDArray,
             partial_dependence: npt.NDArray):

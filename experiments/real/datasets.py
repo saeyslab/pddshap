@@ -1,3 +1,4 @@
+import yaml
 from sklearn.preprocessing import LabelEncoder, OrdinalEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 import numpy as np
@@ -23,31 +24,6 @@ UCI:
 - https://archive.ics.uci.edu/ml/datasets/Page+Blocks+Classification
 
 """
-
-_DS_DICT = {
-    "adult": {"data_id": 1590, "pred_type": "classification"},
-    "credit": {"data_id": 31, "pred_type": "classification"},
-    "abalone": {"data_id": 1557, "pred_type": "classification"},
-    "digits": {"data_id": 28, "pred_type": "classification"},
-    "iris": {"data_id": 61, "pred_type": "classification"},
-    "satimage": {"data_id": 182, "pred_type": "classification"},
-    "australian": {"data_id": 40981, "pred_type": "classification"},
-    "diabetes": {"data_id": 37, "pred_type": "classification"},
-    "phoneme": {"data_id": 1489, "pred_type": "classification"},
-    "musk": {"data_id": 40666, "pred_type": "classification"},
-    "bodyfat": {"data_id": 560, "pred_type": "regression"},
-    "superconduct": {"data_id": 43174, "pred_type": "regression"},
-    "housing": {"data_id": 43939, "pred_type": "regression"},
-    "kin8nm": {"data_id": 189, "pred_type": "regression"}
-}
-
-
-def get_ds_metadata(ds_name):
-    return _DS_DICT[ds_name]
-
-
-def get_valid_datasets():
-    return _DS_DICT.keys()
 
 
 def get_pred_type(ds_name):
@@ -101,3 +77,8 @@ def get_dataset(ds_name, data_dir, download=True, force_download=False)\
         return X_train, X_test, y_train, y_test
     else:
         raise ValueError(f"Dataset {ds_name} not found. Set download=True to allow downloading from OpenML.")
+
+
+if __name__ == "__main__":
+    # Read datasets.yaml file
+    with open()

@@ -1,0 +1,42 @@
+adult:
+  data_id: 1590
+  pred_type: classification
+credit:
+  data_id: 31
+  pred_type: classification
+abalone:
+  data_id: 1557
+  pred_type: classification
+digits:
+  data_id: 28
+  pred_type: classification
+iris:
+  data_id: 61
+  pred_type: classification
+satimage:
+  data_id: 182
+  pred_type: classification
+australian:
+  data_id: 40981
+  pred_type: classification
+diabetes:
+  data_id: 37
+  pred_type: classification
+phoneme:
+  data_id: 1489
+  pred_type: classification
+musk:
+  data_id: 40666
+  pred_type: classification
+bodyfat:
+  data_id: 560
+  pred_type: regression
+superconduct:
+  data_id: 43174
+  pred_type: regression
+housing:
+  data_id: 43939
+  pred_type: regression
+kin8nm:
+  data_id: 189
+  pred_type: regression
