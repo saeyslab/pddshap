@@ -1,6 +1,6 @@
 from typing import Callable, Dict, Optional, Union
 from .estimator import KNNPDDEstimator, PDDEstimator, ConstantPDDEstimator, \
-        TreePDDEstimator, ForestPDDEstimator, GaussianProcessPDDEstimator
+        TreePDDEstimator, GradientBoostingPDDEstimator, GaussianProcessPDDEstimator
 from .sampling import CollocationMethod, ConditioningMethod
 from .signature import FeatureSubset, DataSignature
 import numpy as np
@@ -21,7 +21,7 @@ class PDDComponent:
         self.fitted = False
         est_constructors = {
             "tree": TreePDDEstimator,
-            "forest": ForestPDDEstimator,
+            "forest": GradientBoostingPDDEstimator,
             "knn": KNNPDDEstimator,
             "gp": GaussianProcessPDDEstimator
         }

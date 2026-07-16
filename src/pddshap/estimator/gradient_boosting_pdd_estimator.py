@@ -2,10 +2,10 @@ from pddshap.estimator import PDDEstimator, EstimatorNotFittedException
 from pddshap.signature import FeatureSubset
 from numpy import typing as npt
 from typing import Optional, Dict, List
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 
 
-class ForestPDDEstimator(PDDEstimator):
+class GradientBoostingPDDEstimator(PDDEstimator):
     def __init__(self, categories: Dict[int, List[int]],
                  feature_subset: FeatureSubset):
         super().__init__(categories, feature_subset)
@@ -13,7 +13,9 @@ class ForestPDDEstimator(PDDEstimator):
 
     def fit(self, collocation_points: npt.NDArray,
             partial_dependence: npt.NDArray):
-        self.forest = RandomForestRegressor()
+        self.forest = GradientBoostingRegressor()
+        if partial_dependence.shape[1] == 1:
+            partial_dependence = partial_dependence.ravel()
         self.forest.fit(collocation_points, partial_dependence)
 
     def __call__(self, data: npt.NDArray):
