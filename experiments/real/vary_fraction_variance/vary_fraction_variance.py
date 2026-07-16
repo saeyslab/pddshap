@@ -24,7 +24,7 @@ It requires a data directory containing the datasets, models and original shaple
 This corresponds to the OUT_DIR from compute_shap.py.
 
 Results are saved in a separate directory OUT_DIR.
-For each fraction of variance x.yyy and model, the results are saved in OUT_DIR/DATASET_NAME/MODEL_NAME/x.yyy.
+For each fraction of variance x.yy and model, the results are saved in OUT_DIR/DATASET_NAME/MODEL_NAME/xyy.
 For example: for dataset adult, fraction of variance 0.95 and model knn, results are saved in OUT_DIR/adult/knn/095.
 
 For each dataset, runtimes are saved in OUT_DIR/DATASET_NAME/runtimes.csv.

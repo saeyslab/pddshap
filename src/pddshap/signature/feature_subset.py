@@ -1,4 +1,3 @@
-from typing import Collection
 from numpy import typing as npt
 import numpy as np
 

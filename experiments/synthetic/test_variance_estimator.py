@@ -1,7 +1,7 @@
 from pddshap.variance import VarianceEstimator
 from pddshap.signature import FeatureSubset
 import numpy as np
-from experiments.synthetic.multilinear_polynomial import MultilinearPolynomial
+from multilinear_polynomial import MultilinearPolynomial
 
 
 if __name__ == "__main__":
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     X = np.random.multivariate_normal(mean, cov, size=10000).astype(np.float32)
 
     est = VarianceEstimator(X, model, lower_sobol_strategy="lower_bound")
-    print(f"Estimated variance: {est.model_variance}")
+    print(f"Estimated variance: {est.model_variance.item()}, true variance: {model.variance()}")
     
     for fs in feature_sets:
         print(f"Lower Sobol index {fs}: {est.lower_sobol_index(fs)}")

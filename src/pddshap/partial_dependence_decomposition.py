@@ -4,7 +4,7 @@ TODO add module docstring
 
 from collections import defaultdict
 from itertools import combinations
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 from joblib import Parallel, delayed
 
 import numpy as np
@@ -122,7 +122,7 @@ class PartialDependenceDecomposition:
 
     def fit(
         self,
-        background_data: pd.DataFrame,
+        background_data: pd.DataFrame | npt.NDArray,
         feature_set_selection: str = "max_size",
         variance_explained: Optional[float] = None,
         coe_threshold: Optional[float] = None,
@@ -181,6 +181,7 @@ class PartialDependenceDecomposition:
         # Otherwise, we use the feature_set_selection method
         if feature_sets is None:
             if feature_set_selection == "max_size":
+                assert max_size is not None, "max_size must be set"
                 feature_sets = []
                 for i in range(1, max_size + 1):
                     feature_sets += list(
@@ -218,7 +219,7 @@ class PartialDependenceDecomposition:
                     background_data, fs) for fs in tqdm(cur_subsets))
             fs_size += 1
             cur_subsets = [fs for fs in feature_sets if len(fs) == fs_size]
-    
+
     def _fit_component(self, background_data: npt.NDArray, feature_set: FeatureSubset):
         # All subcomponents are necessary to compute the values
         # for this component
@@ -237,7 +238,6 @@ class PartialDependenceDecomposition:
         )
         component.fit(background_data, self.model, subcomponents)
         self.components[feature_set] = component
-
 
     def __call__(self, data: pd.DataFrame | npt.NDArray):
         """
@@ -274,7 +274,6 @@ class PartialDependenceDecomposition:
                 incomparables = FeatureSubset(*partial_ordering.get_incomparables(feature))
                 result.append(len(incomparables.intersection(feature_subset)))
         return np.array(result)
-
 
     def shapley_values(
         self, data: pd.DataFrame | npt.NDArray, project=False,
