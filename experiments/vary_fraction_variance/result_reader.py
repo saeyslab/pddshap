@@ -1,5 +1,4 @@
 import os
-from typing import Dict
 
 import numpy as np
 import numpy.typing as npt
@@ -37,14 +36,14 @@ class ResultReader:
             )
         )
 
-    def _load_pddshap(self, dataset: str) -> Dict[str, npt.NDArray]:
+    def _load_pddshap(self, dataset: str) -> dict[str, npt.NDArray]:
         result_dir = os.path.join(self.result_dir, dataset, self.model)
         return {
             frac: np.load(os.path.join(result_dir, frac, "values.npy"))
             for frac in os.listdir(result_dir)
         }
 
-    def get_score(self, dataset: str, score="pearson") -> Dict[str, npt.NDArray]:
+    def get_score(self, dataset: str, score="pearson") -> dict[str, npt.NDArray]:
         """
         Comparse the Shapley values produced by PDD-SHAP and those produced by the baseline algorithm for a given dataset.
         A dict is returned that contains an array of scores for each fraction of variance setting.
@@ -53,7 +52,7 @@ class ResultReader:
 
         :param dataset: the dataset to extract results from
         :param score_fn: type of score to compute
-        :return: Dict: frac_variance (str) -> scores (NDArray: [num_rows, num_outputs])
+        :return: dict: frac_variance (str) -> scores (NDArray: [num_rows, num_outputs])
         """
         if score not in ["pearson", "spearman", "r2"]:
             raise ValueError("corr_type must be pearson or spearman")
@@ -89,7 +88,7 @@ class ResultReader:
             """
         return result
 
-    def get_runtimes(self, dataset: str) -> Dict:
+    def get_runtimes(self, dataset: str) -> dict:
         """
         Returns the runtimes of sampling shapley values (for baseline) or training and inference (for PDDSHAP).
         :param dataset: the dataset to extract results from
