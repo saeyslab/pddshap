@@ -17,6 +17,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "h5py",
     "matplotlib",
     "shap",
     "seaborn",
