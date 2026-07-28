@@ -1,14 +1,9 @@
-"""
-TODO add module docstring
-"""
-
 from collections import defaultdict
 from itertools import combinations
-from typing import Dict, List, Optional, Union
-from joblib import Parallel, delayed
 
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 from numpy import typing as npt
 from sklearn import cluster
 from tqdm import tqdm
@@ -21,10 +16,6 @@ from .variance import COETracker, VarianceEstimator
 
 
 class PartialDependenceDecomposition:
-    """
-    TODO add class docstring
-    """
-
     def __init__(
         self,
         model: Model,
@@ -34,21 +25,19 @@ class PartialDependenceDecomposition:
         est_kwargs=None,
     ) -> None:
         self.model = model
-        self.components: Dict[
-            FeatureSubset, Union[ConstantPDDComponent, PDDComponent]
-        ] = {}
+        self.components: dict[FeatureSubset, ConstantPDDComponent | PDDComponent] = {}
         self.collocation_method = collocation_method
         self.conditioning_method = conditioning_method
         self.estimator_type = estimator_type
         self.est_kwargs = est_kwargs if est_kwargs is not None else {}
-        self.data_signature: Optional[DataSignature] = None
+        self.data_signature: DataSignature | None = None
 
         self.bg_avg = None
         self.num_outputs = None
 
     def _get_significant_feature_sets(
         self, data: npt.NDArray, model: Model, variance_explained: float, max_size: int
-    ) -> List[FeatureSubset]:
+    ) -> list[FeatureSubset]:
         """
         Computes all subsets (up to a given cardinality) that should be
         incorporated in an ANOVA decomposition model in order to explain a given
@@ -58,12 +47,12 @@ class PartialDependenceDecomposition:
             by the components
         :param max_cardinality: Maximal cardinality of subsets.
         :return: Dictionary containing significant subsets for each
-            cardinality: {int: List[Tuple]}
+            cardinality: {int: list[tuple]}
         """
 
         # Maps cardinality to included feature sets of that cardinality
         # and their estimated component variance for each output
-        result: List[FeatureSubset] = []
+        result: list[FeatureSubset] = []
         variance_estimator = VarianceEstimator(
             data, model, lower_sobol_strategy="lower_bound", lower_sobol_threshold=0.1
         )
@@ -85,7 +74,7 @@ class PartialDependenceDecomposition:
         # feature set that have been included.
         # If all immediate subsets of a feature set are included, then that
         # feature set should be added to the queue.
-        subset_counts: Dict[FeatureSubset, int] = defaultdict(lambda: 0)
+        subset_counts: dict[FeatureSubset, int] = defaultdict(lambda: 0)
 
         # Add subsets in order of decreasing CoE until the desired fraction of
         # variance has been included
@@ -122,19 +111,22 @@ class PartialDependenceDecomposition:
 
     def fit(
         self,
+        training_data: pd.DataFrame | npt.NDArray,
         background_data: pd.DataFrame | npt.NDArray,
         feature_set_selection: str = "max_size",
-        variance_explained: Optional[float] = None,
-        coe_threshold: Optional[float] = None,
-        max_size: Optional[int] = None,
-        feature_sets: Optional[List[FeatureSubset]] = None,
-        kmeans: Optional[int] = None,
-        n_jobs: Optional[int] = 1,
+        variance_explained: float | None = None,
+        coe_threshold: float | None = None,
+        max_size: int | None = None,
+        feature_sets: list[FeatureSubset] | None = None,
+        kmeans: int | None = None,
+        n_jobs: int = 1,
     ) -> None:
         """
         Fit the partial dependence decomposition using a given
         background dataset.
 
+        :param training_data: Full training dataset. 
+            Only used to extract data signature (valid categories for onehot encoding)
         :param background_data: Background dataset
         :param max_size: Maximal size of subsets to be modeled.
             If None, max_size will be set to the number of features.
@@ -168,13 +160,15 @@ class PartialDependenceDecomposition:
             assert coe_threshold is not None, "coe_threshold must be set"
         if feature_set_selection == "coe_var_explained":
             assert variance_explained is not None, "variance_explained must be set"
-        self.data_signature = DataSignature(background_data)
+        self.data_signature = DataSignature(training_data)
         if isinstance(background_data, pd.DataFrame):
             background_data = background_data.to_numpy()
         if max_size is None:
             max_size = background_data.shape[1]
         if kmeans is not None:
-            background_data = cluster.KMeans(n_clusters=kmeans).fit(background_data).cluster_centers_
+            background_data = (
+                cluster.KMeans(n_clusters=kmeans).fit(background_data).cluster_centers_
+            )
 
         # Select subsets to be modeled
         # If feature_sets is not None, we use the given feature sets
@@ -184,10 +178,10 @@ class PartialDependenceDecomposition:
                 assert max_size is not None, "max_size must be set"
                 feature_sets = []
                 for i in range(1, max_size + 1):
-                    feature_sets += list(
+                    feature_sets += [
                         FeatureSubset(*comb)
                         for comb in combinations(range(background_data.shape[1]), i)
-                    )
+                    ]
             elif feature_set_selection == "coe_threshold" and coe_threshold is not None:
                 # TODO use coe_threshold
                 feature_sets = self._get_significant_feature_sets(
@@ -215,8 +209,9 @@ class PartialDependenceDecomposition:
         while len(cur_subsets) > 0:
             print("Fitting components of size", fs_size, "...")
             Parallel(n_jobs=n_jobs)(
-                delayed(self._fit_component)(
-                    background_data, fs) for fs in tqdm(cur_subsets))
+                delayed(self._fit_component)(background_data, fs)
+                for fs in tqdm(cur_subsets)
+            )
             fs_size += 1
             cur_subsets = [fs for fs in feature_sets if len(fs) == fs_size]
 
@@ -249,11 +244,11 @@ class PartialDependenceDecomposition:
             data = data.values
         pdp_values = self.evaluate(data)
         result = np.zeros(shape=(data.shape[0], self.num_outputs))
-        for _, values in pdp_values.items():
+        for values in pdp_values.values():
             result += values
         return result
 
-    def evaluate(self, data: npt.NDArray) -> Dict[FeatureSubset, npt.NDArray]:
+    def evaluate(self, data: npt.NDArray) -> dict[FeatureSubset, npt.NDArray]:
         """
         Evaluate PDP decomposition at all rows in data
         :param data: [num_rows, num_features]
@@ -264,20 +259,25 @@ class PartialDependenceDecomposition:
             subset: component(data) for subset, component in self.components.items()
         }
 
-    def _asv_coefficients(self, feature_subset: FeatureSubset,
-                          partial_ordering: SimplePartialOrdering):
+    def _asv_coefficients(
+        self, feature_subset: FeatureSubset, partial_ordering: SimplePartialOrdering
+    ):
         result = []
         for feature in feature_subset:
             if partial_ordering.contains_successor(feature, feature_subset):
                 result.append(0)
             else:
-                incomparables = FeatureSubset(*partial_ordering.get_incomparables(feature))
+                incomparables = FeatureSubset(
+                    *partial_ordering.get_incomparables(feature)
+                )
                 result.append(len(incomparables.intersection(feature_subset)))
         return np.array(result)
 
     def shapley_values(
-        self, data: pd.DataFrame | npt.NDArray, project=False,
-        partial_ordering: Optional[List[List[Union[int, str]]]] = None
+        self,
+        data: pd.DataFrame | npt.NDArray,
+        project=False,
+        partial_ordering: list[list[int | str]] | None = None,
     ) -> npt.NDArray:
         """
         Compute Shapley values for each row in data.
@@ -288,14 +288,17 @@ class PartialDependenceDecomposition:
         :return: NDArray containing Shapley values for each row and each output.
             Shape: (num_rows, self.num_features, num_outputs)
         """
-        assert self.data_signature is not None, "Must fit model before computing Shapley values"
+        assert self.data_signature is not None, (
+            "Must fit model before computing Shapley values"
+        )
         if isinstance(data, pd.DataFrame):
             data = data.values
         pdp_values = self.evaluate(data)
 
         if partial_ordering is not None:
             simple_partial_ordering = SimplePartialOrdering(
-                partial_ordering, self.data_signature)
+                partial_ordering, self.data_signature
+            )
 
         result = np.zeros(shape=(data.shape[0], data.shape[1], self.num_outputs))
         for feature_subset, output_vector in pdp_values.items():
@@ -303,10 +306,16 @@ class PartialDependenceDecomposition:
                 component_effect = np.expand_dims(output_vector, axis=1)
                 features = feature_subset.features
                 if partial_ordering is not None:
-                    coef = self._asv_coefficients(feature_subset, simple_partial_ordering)
+                    coef = self._asv_coefficients(
+                        feature_subset, simple_partial_ordering
+                    )
                     nonzero_features = np.array(features)[coef != 0]
-                    component_effect = np.tile(component_effect, (1, len(nonzero_features), 1))
-                    result[:, nonzero_features, :] += component_effect / coef[coef != 0].reshape(1, -1, 1)
+                    component_effect = np.tile(
+                        component_effect, (1, len(nonzero_features), 1)
+                    )
+                    result[:, nonzero_features, :] += component_effect / coef[
+                        coef != 0
+                    ].reshape(1, -1, 1)
                 else:
                     result[:, features, :] += component_effect / len(feature_subset)
 
