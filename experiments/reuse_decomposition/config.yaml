@@ -1,0 +1,7 @@
+dataset: "adult"
+
+pdd:
+  feature_set_selection: "max_size"
+  max_size: 2
+  collocation_frac: 1.0
+  background_size: 100
