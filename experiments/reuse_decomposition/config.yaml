@@ -5,3 +5,4 @@ pdd:
   max_size: 2
   collocation_frac: 1.0
   background_size: 100
+  num_explanations: 100
