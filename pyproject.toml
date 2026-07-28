@@ -22,6 +22,7 @@ dev = [
     "seaborn",
     "numba==0.63.1",
     "ipython>=9.15.0",
+    "pyyaml>=6.0.3",
 ]
 
 [build-system]
