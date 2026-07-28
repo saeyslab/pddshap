@@ -2,7 +2,7 @@ import argparse
 from sklearn.metrics import balanced_accuracy_score, r2_score
 from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from experiments.real.datasets import get_valid_datasets, get_dataset, get_pred_type
+from experiments.download_datasets import get_valid_datasets, get_dataset, get_pred_type
 from tqdm import tqdm
 import csv
 import os
