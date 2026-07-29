@@ -36,18 +36,20 @@ def save_shap_values(arr: np.ndarray, feature_names: list[str], path: str) -> No
     with h5py.File(path, "w") as h5f:
         h5f.create_dataset("values", data=arr)
         str_dtype = h5py.string_dtype(encoding="utf-8")
-        h5f.create_dataset("feature_names", data=np.array(feature_names, dtype=str_dtype))
+        h5f.create_dataset(
+            "feature_names", data=np.array(feature_names, dtype=str_dtype)
+        )
 
 
 def random_partial_ordering(
-    features: list[str], rng: np.random.Generator
+    num_elements: int, rng: np.random.Generator
 ) -> list[list[str]]:
     """Create a random partial ordering as a list of variable-length feature groups."""
-    shuffled = list(rng.permutation(features))
+    shuffled = list(rng.permutation(range(num_elements)))
     groups: list[list[str]] = []
     current: list[str] = []
     for feature in shuffled:
-        current.append(feature)
+        current.append(int(feature))
         # End the current rank with moderate probability to get variable group sizes.
         if len(current) > 1 and rng.random() < 0.35:
             groups.append(current)
@@ -68,7 +70,9 @@ if __name__ == "__main__":
     # Load shared config and experiment-specific config
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     shared_config_path = repo_root / "experiments" / "config" / "config.yaml"
-    experiment_config_path = repo_root / "experiments" / "reuse_decomposition" / "config.yaml"
+    experiment_config_path = (
+        repo_root / "experiments" / "reuse_decomposition" / "config.yaml"
+    )
     datasets_config_path = repo_root / "experiments" / "config" / "datasets.yaml"
 
     with open(shared_config_path, "r") as fp:
@@ -125,8 +129,12 @@ if __name__ == "__main__":
     pred_fn = model.predict_proba if pred_type == "classification" else model.predict
 
     print("Saving model predictions...")
-    save_predictions(pred_fn(X_train.to_numpy()), str(ds_out_dir / "gb_predictions_train.csv"))
-    save_predictions(pred_fn(X_test.to_numpy()), str(ds_out_dir / "gb_predictions_test.csv"))
+    save_predictions(
+        pred_fn(X_train.to_numpy()), str(ds_out_dir / "gb_predictions_train.csv")
+    )
+    save_predictions(
+        pred_fn(X_test.to_numpy()), str(ds_out_dir / "gb_predictions_test.csv")
+    )
 
     # Build and fit the partial dependence decomposition on the background set
     print("Fitting PDD...")
@@ -142,22 +150,31 @@ if __name__ == "__main__":
         X_bg,
         feature_set_selection=pdd_cfg["feature_set_selection"],
         max_size=pdd_cfg["max_size"],
+        n_jobs=-1,
     )
+    with open(ds_out_dir / "data_signature.json", "w") as fp:
+        fp.write(pdd.data_signature.to_json())
 
     # Compute and save PDD predictions
     print("Saving PDD predictions...")
-    save_predictions(pdd(X_train.to_numpy()), str(ds_out_dir / "pdd_predictions_train.csv"))
-    save_predictions(pdd(X_test.to_numpy()), str(ds_out_dir / "pdd_predictions_test.csv"))
+    save_predictions(
+        pdd(X_train.to_numpy()), str(ds_out_dir / "pdd_predictions_train.csv")
+    )
+    save_predictions(
+        pdd(X_test.to_numpy()), str(ds_out_dir / "pdd_predictions_test.csv")
+    )
 
     # Generate and save SHAP values with the fitted decomposition
     print("Saving PDD-SHAP explanations...")
     shap_values = pdd.shapley_values(X_explain)
-    save_shap_values(shap_values, list(X_explain.columns), str(ds_out_dir / "pdd_shap.h5"))
+    save_shap_values(
+        shap_values, list(X_explain.columns), str(ds_out_dir / "pdd_shap.h5")
+    )
 
     # Generate and save SHAP values using a random partial ordering
     print("Saving PDD-SHAP explanations with partial ordering...")
     rng = np.random.default_rng(random_seed)
-    partial_ordering = random_partial_ordering(list(X_explain.columns), rng)
+    partial_ordering = random_partial_ordering(len(X_explain.columns), rng)
     with open(ds_out_dir / "partial_ordering.json", "w") as fp:
         json.dump(partial_ordering, fp, indent=2)
 

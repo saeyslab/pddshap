@@ -1,4 +1,5 @@
-from typing import Collection, Dict, List, Tuple
+import json
+from collections.abc import Collection
 
 import numpy as np
 import pandas as pd
@@ -26,13 +27,16 @@ class DataSignature:
         :param categorical_features: a collection of integers indicating the categorical variables
             (ignored if dataframe is a pandas DataFrame).
         """
-        self.feature_names: Tuple[str, ...]
+        self.feature_names: tuple[str, ...]
         self.num_features: int
-        self.categories: Dict[int, List[int]] = {}
+        self.categories: dict[int, list[int]] = {}
 
         if isinstance(dataframe, pd.DataFrame):
             self.feature_names = tuple(dataframe.columns)
-            if any(dt not in ["int8", "int64", "float32", "float64"] for dt in dataframe.dtypes):
+            if any(
+                dt not in ["int8", "int64", "float32", "float64"]
+                for dt in dataframe.dtypes
+            ):
                 raise ValueError(
                     "Encode categorical values as int8 and numerical as float32 or float64"
                 )
@@ -40,7 +44,9 @@ class DataSignature:
                 if dataframe.dtypes[feat_name] in ["int8", "int64"]:
                     self.categories[i] = list(range(dataframe[feat_name].max() + 1))
         else:
-            assert categorical_features is not None, "categorical_features must be provided for numpy arrays"
+            assert categorical_features is not None, (
+                "categorical_features must be provided for numpy arrays"
+            )
             self.feature_names = tuple(str(i) for i in range(dataframe.shape[1]))
             for cat_feat in categorical_features:
                 self.categories[cat_feat] = list(np.unique(dataframe[:, cat_feat]))
@@ -48,7 +54,7 @@ class DataSignature:
 
     def get_categories(
         self, feature_subset: FeatureSubset | None = None
-    ) -> Dict[int, List[int]]:
+    ) -> dict[int, list[int]]:
         if feature_subset is None:
             return self.categories
         return {
@@ -56,3 +62,9 @@ class DataSignature:
             for key, value in self.categories.items()
             if key in feature_subset
         }
+
+    def to_json(self):
+        return json.dumps({
+            "feature_names": self.feature_names,
+            "categories": self.categories
+        })
