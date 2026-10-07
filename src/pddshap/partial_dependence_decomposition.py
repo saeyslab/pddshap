@@ -12,7 +12,6 @@ from . import ConstantPDDComponent, PDDComponent
 from .sampling import CollocationMethod, ConditioningMethod
 from .signature import DataSignature, FeatureSubset
 from .util import Model, SimplePartialOrdering
-from .variance import COETracker, VarianceEstimator
 
 
 class PartialDependenceDecomposition:
@@ -35,87 +34,10 @@ class PartialDependenceDecomposition:
         self.bg_avg = None
         self.num_outputs = None
 
-    def _get_significant_feature_sets(
-        self, data: npt.NDArray, model: Model, variance_explained: float, max_size: int
-    ) -> list[FeatureSubset]:
-        """
-        Computes all subsets (up to a given cardinality) that should be
-        incorporated in an ANOVA decomposition model in order to explain a given
-        fraction of the variance.
-
-        :param variance_explained: Desired fraction of variance modeled
-            by the components
-        :param max_cardinality: Maximal cardinality of subsets.
-        :return: Dictionary containing significant subsets for each
-            cardinality: {int: list[tuple]}
-        """
-
-        # Maps cardinality to included feature sets of that cardinality
-        # and their estimated component variance for each output
-        result: list[FeatureSubset] = []
-        variance_estimator = VarianceEstimator(
-            data, model, lower_sobol_strategy="lower_bound", lower_sobol_threshold=0.1
-        )
-        # Current fraction of variance explained for each output
-        cur_var_explained = np.zeros(variance_estimator.num_outputs)
-        num_columns = data.shape[1]
-
-        # Keep track of CoE values for candidate components, while taking into
-        # account possible multiple outputs
-        tracker = COETracker(num_columns, variance_estimator.num_outputs)
-
-        # We start with all singleton subsets
-        for i in range(num_columns):
-            # coe contains CoE for each output
-            coe = variance_estimator.cost_of_exclusion(FeatureSubset(i))
-            tracker.push(FeatureSubset(i), coe)
-
-        # subset_counts contains the number of immediate subsets for each
-        # feature set that have been included.
-        # If all immediate subsets of a feature set are included, then that
-        # feature set should be added to the queue.
-        subset_counts: dict[FeatureSubset, int] = defaultdict(lambda: 0)
-
-        # Add subsets in order of decreasing CoE until the desired fraction of
-        # variance has been included
-        while np.any(tracker.active_outputs) and not tracker.empty():
-            # Pop the next feature subset to be modeled, which is the one
-            # having the largest CoE over all active outputs
-            feature_subset = tracker.pop()
-            print(feature_subset)
-            if len(feature_subset) <= max_size:
-                # Compute component variance and add it to variance explained
-                component_variance = variance_estimator.component_variance(
-                    feature_subset
-                )
-                component_variance = np.maximum(component_variance, 0)
-                cur_var_explained += component_variance
-                # Add feature subset + its variance to the result
-                result.append(feature_subset)
-                # Increment subset_counts for each immediate superset of
-                # feature_subset
-                for i in range(num_columns):
-                    if i not in feature_subset:
-                        superset = FeatureSubset(i, *feature_subset)
-                        subset_counts[superset] += 1
-                        # If all immediate subsets of superset have been
-                        # included, add superset to queue
-                        if subset_counts[superset] == len(superset):
-                            coe = variance_estimator.cost_of_exclusion(superset)
-                            tracker.push(superset, coe)
-            # Refresh active outputs
-            tracker.active_outputs = cur_var_explained < variance_explained
-        # Sort subsets in result by size
-        result.sort(key=len)
-        return result
-
     def fit(
         self,
         training_data: pd.DataFrame | npt.NDArray,
         background_data: pd.DataFrame | npt.NDArray,
-        feature_set_selection: str = "max_size",
-        variance_explained: float | None = None,
-        coe_threshold: float | None = None,
         max_size: int | None = None,
         feature_sets: list[FeatureSubset] | None = None,
         kmeans: int | None = None,
@@ -130,19 +52,6 @@ class PartialDependenceDecomposition:
         :param background_data: Background dataset
         :param max_size: Maximal size of subsets to be modeled.
             If None, max_size will be set to the number of features.
-        :param feature_set_selection: Method for selecting subsets to be
-            modeled. Options:
-            - "max_size": All subsets of size up to max_size will be modeled.
-            - "coe_threshold": All subsets up to max_size will be modeled,
-                but only if their cost of exclusion is above a given threshold.
-                Requires coe_threshold to be set.
-            - "coe_var_explained": All subsets up to max_size will be modeled,
-                until a given fraction of explained variance is reached.
-                Requires variance_explained to be set.
-        :param variance_explained: Fraction of variance to be explained by
-            the model. Only used if feature_set_selection is "coe_frac_var".
-        :param coe_threshold: Threshold for cost of exclusion. Only used if
-            feature_set_selection is "coe_threshold".
         :param kmeans: If not None, the background data will be clustered
             using k-means with the given number of clusters before fitting.
         :param feature_sets: If not None, all subsets in this dictionary will
@@ -151,15 +60,6 @@ class PartialDependenceDecomposition:
         """
 
         # Argument checking and preprocessing
-        assert feature_set_selection in [
-            "max_size",
-            "coe_threshold",
-            "coe_var_explained",
-        ], f"Invalid feature_set_selection: {feature_set_selection}"
-        if feature_set_selection == "coe_threshold":
-            assert coe_threshold is not None, "coe_threshold must be set"
-        if feature_set_selection == "coe_var_explained":
-            assert variance_explained is not None, "variance_explained must be set"
         self.data_signature = DataSignature(training_data)
         if isinstance(background_data, pd.DataFrame):
             background_data = background_data.to_numpy()
@@ -170,32 +70,14 @@ class PartialDependenceDecomposition:
                 cluster.KMeans(n_clusters=kmeans).fit(background_data).cluster_centers_
             )
 
-        # Select subsets to be modeled
-        # If feature_sets is not None, we use the given feature sets
-        # Otherwise, we use the feature_set_selection method
+        # Select subsets to be modeled if not provided explicitly
         if feature_sets is None:
-            if feature_set_selection == "max_size":
-                assert max_size is not None, "max_size must be set"
-                feature_sets = []
-                for i in range(1, max_size + 1):
-                    feature_sets += [
-                        FeatureSubset(*comb)
-                        for comb in combinations(range(background_data.shape[1]), i)
-                    ]
-            elif feature_set_selection == "coe_threshold" and coe_threshold is not None:
-                # TODO use coe_threshold
-                feature_sets = self._get_significant_feature_sets(
-                    background_data, self.model, variance_explained, max_size
-                )
-            elif (
-                feature_set_selection == "coe_var_explained"
-                and variance_explained is not None
-            ):
-                # TODO use component_variance to see if we need to model
-                # each component
-                feature_sets = self._get_significant_feature_sets(
-                    background_data, self.model, variance_explained, max_size
-                )
+            feature_sets = []
+            for i in range(1, max_size + 1):
+                feature_sets += [
+                    FeatureSubset(*comb)
+                    for comb in combinations(range(background_data.shape[1]), i)
+                ]
 
         # First, model the empty component
         empty_component = ConstantPDDComponent(FeatureSubset(), self.data_signature)
