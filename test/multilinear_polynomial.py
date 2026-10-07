@@ -52,7 +52,7 @@ class MultilinearPolynomial(Model):
         :return: The theoretical mean (float)
         """
         if () in self.coefficients:
-            return self.coefficients[FeatureSubset()]
+            return self.coefficients[()]
         return 0.
 
     def __call__(self, data: npt.NDArray):
@@ -104,7 +104,7 @@ class RandomMultilinearPolynomial(MultilinearPolynomial):
         coefficients: Dict[Tuple, float] = {}
         for k in range(len(num_terms)):
             total_num_interactions = special.comb(num_features, k)
-            if type(num_terms[k]) == int:
+            if type(num_terms[k]) is int:
                 num_interactions = num_terms[k]
             else:
                 num_interactions = int(num_terms[k] * total_num_interactions)
