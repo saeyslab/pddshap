@@ -24,6 +24,9 @@ dev = [
     "numba==0.63.1",
     "ipython>=9.15.0",
     "pyyaml>=6.0.3",
+    "pytest>=8.0.0",
+    "ipykernel",
+    "nbconvert",
 ]
 
 [build-system]
@@ -32,3 +35,6 @@ build-backend = "uv_build"
 
 [tool.uv]
 default-groups = ["dev"]
+
+[tool.pyright]
+typeCheckingMode = "off"
