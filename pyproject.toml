@@ -15,15 +15,22 @@ dependencies = [
     "tqdm"
 ]
 
+# Needed only by pddshap.experiments (benchmarking/experiment-support helpers under
+# experiments/, not by the core decomposition library). Install with `pddshap[experiments]`.
+[project.optional-dependencies]
+experiments = [
+    "h5py",
+    "pyyaml>=6.0.3",
+    "shap",
+]
+
 [dependency-groups]
 dev = [
-    "h5py",
+    "pddshap[experiments]",
     "matplotlib",
-    "shap",
     "seaborn",
     "numba==0.63.1",
     "ipython>=9.15.0",
-    "pyyaml>=6.0.3",
     "pytest>=8.0.0",
     "ipykernel",
     "nbconvert",

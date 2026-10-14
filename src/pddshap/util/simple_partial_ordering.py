@@ -1,5 +1,35 @@
+import numpy as np
+
 from ..signature import DataSignature
 from ..signature.feature_subset import FeatureSubset
+
+
+def random_partial_ordering(
+    num_elements: int, rng: np.random.Generator
+) -> list[list[int]]:
+    """Create a random partial ordering as a list of variable-length feature groups."""
+    shuffled = list(rng.permutation(range(num_elements)))
+    groups: list[list[int]] = []
+    current: list[int] = []
+    for feature in shuffled:
+        current.append(int(feature))
+        # End the current rank with moderate probability to get variable group sizes.
+        if len(current) > 1 and rng.random() < 0.35:
+            groups.append(current)
+            current = []
+
+    if current:
+        groups.append(current)
+
+    # Avoid degenerate single-group ordering for multi-feature datasets.
+    if len(groups) == 1 and len(shuffled) > 1:
+        split = int(rng.integers(1, len(shuffled)))
+        groups = [
+            [int(f) for f in shuffled[:split]],
+            [int(f) for f in shuffled[split:]],
+        ]
+
+    return groups
 
 
 class SimplePartialOrdering:

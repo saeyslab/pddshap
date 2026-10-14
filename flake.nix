@@ -18,10 +18,8 @@
         # default library search path. Expose them via LD_LIBRARY_PATH so `uv sync`
         # installed wheels work without recompiling from source.
         libPath = pkgs.lib.makeLibraryPath [
-          pkgs.stdenv.cc.cc.lib
+          pkgs.stdenv.cc.cc
           pkgs.zlib
-          pkgs.libGL
-          pkgs.glib
         ];
       in
       {

@@ -1,7 +1,7 @@
 """
 Shared fixtures for the PartialDependenceDecomposition test suite.
 
-The model under test is a multilinear polynomial (multilinear_polynomial.py),
+The model under test is a multilinear polynomial (pddshap.synthetic.multilinear),
 which has closed-form Shapley values and no 3rd-order interaction. This lets
 tests check PDD-SHAP's output against ground truth (with max_size=2 having no
 structural approximation error) instead of just checking it runs.
@@ -14,8 +14,7 @@ from sklearn.model_selection import train_test_split
 
 from pddshap import PartialDependenceDecomposition
 from pddshap.sampling import IndependentConditioningMethod, RandomSubsampleCollocation
-
-from .multilinear_polynomial import RandomMultilinearPolynomial
+from pddshap.experiments import RandomMultilinearPolynomial
 
 NUM_FEATURES = 3
 SEED = 0
@@ -24,8 +23,8 @@ SEED = 0
 # A larger background reduces Monte-Carlo noise in the conditional-expectation
 # estimates that each PDDComponent is fitted on, which matters most for the
 # less smooth estimators (tree, forest).
-TOTAL_SIZE = 3000
-TEST_SIZE = 0.85
+TOTAL_SIZE = 1000
+TEST_SIZE = 0.1
 
 # Per-estimator quality thresholds. These differ because the estimators have
 # different inductive biases (e.g. a single unconstrained DecisionTreeRegressor
@@ -45,7 +44,7 @@ ESTIMATOR_CONFIGS = [
         {
             "estimator_type": "forest",
             "est_kwargs": {},
-            "r2_threshold": 0.85,
+            "r2_threshold": 0.9,
             "pearson_threshold": 0.9,
         },
         id="forest",
@@ -54,7 +53,7 @@ ESTIMATOR_CONFIGS = [
         {
             "estimator_type": "tree",
             "est_kwargs": {},
-            "r2_threshold": 0.75,
+            "r2_threshold": 0.9,
             "pearson_threshold": 0.9,
         },
         id="tree",

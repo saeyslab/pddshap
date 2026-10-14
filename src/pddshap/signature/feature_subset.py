@@ -70,7 +70,7 @@ class FeatureSubset:
         return hash(self._features)
 
     def __eq__(self, other):
-        return type(other) == FeatureSubset and other.features == self.features
+        return type(other) is FeatureSubset and other.features == self.features
 
     def __ne__(self, other):
         return self != other

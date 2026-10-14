@@ -1,10 +1,12 @@
-import numpy as np
-from scipy import special
 import itertools
 from typing import Dict, Tuple, List, Union, Callable
+
+import numpy as np
 from numpy import typing as npt
-from pddshap.signature import FeatureSubset
-from pddshap.util import Model
+from scipy import special
+
+from ..signature import FeatureSubset
+from ..util import Model
 
 
 class MultilinearPolynomial(Model):
