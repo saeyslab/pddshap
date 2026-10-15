@@ -21,8 +21,8 @@ SEED = 0
 
 # Background/collocation size (X_train below) and the held-out test size.
 # A larger background reduces Monte-Carlo noise in the conditional-expectation
-# estimates that each PDDComponent is fitted on, which matters most for the
-# less smooth estimators (tree, forest).
+# estimates that each feature subset's estimator is fitted on, which matters
+# most for the less smooth estimators (tree, forest).
 TOTAL_SIZE = 1000
 TEST_SIZE = 0.1
 

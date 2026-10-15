@@ -1,2 +1,1 @@
-from .pdd_component import PDDComponent, ConstantPDDComponent
 from .partial_dependence_decomposition import PartialDependenceDecomposition

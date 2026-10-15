@@ -7,10 +7,24 @@ from numpy import typing as npt
 from sklearn import cluster
 from tqdm import tqdm
 
-from . import ConstantPDDComponent, PDDComponent
+from .estimator import (
+    ConstantPDDEstimator,
+    GaussianProcessPDDEstimator,
+    GradientBoostingPDDEstimator,
+    KNNPDDEstimator,
+    PDDEstimator,
+    TreePDDEstimator,
+)
 from .sampling import CollocationMethod, ConditioningMethod
 from .signature import DataSignature, FeatureSubset
 from .util import Model, SimplePartialOrdering
+
+EST_CONSTRUCTORS = {
+    "tree": TreePDDEstimator,
+    "forest": GradientBoostingPDDEstimator,
+    "knn": KNNPDDEstimator,
+    "gp": GaussianProcessPDDEstimator,
+}
 
 
 class PartialDependenceDecomposition:
@@ -23,10 +37,10 @@ class PartialDependenceDecomposition:
         est_kwargs=None,
     ) -> None:
         self.model = model
-        self.components: dict[FeatureSubset, ConstantPDDComponent | PDDComponent] = {}
+        self.components: dict[FeatureSubset, PDDEstimator] = {}
         self.collocation_method = collocation_method
         self.conditioning_method = conditioning_method
-        self.estimator_type = estimator_type
+        self.est_constructor = EST_CONSTRUCTORS[estimator_type]
         self.est_kwargs = est_kwargs if est_kwargs is not None else {}
         self.data_signature: DataSignature | None = None
 
@@ -82,25 +96,37 @@ class PartialDependenceDecomposition:
                     for comb in combinations(range(background_data.shape[1]), i)
                 ]
 
-        # First, model the empty component
-        empty_component = ConstantPDDComponent(FeatureSubset(), self.data_signature)
-        self.bg_avg = empty_component.fit(background_data, self.model)
-        self.components[FeatureSubset()] = empty_component
-        self.num_outputs = empty_component.num_outputs
+        # First, model the empty component: the model's average output over
+        # the background data
+        output = self.model(background_data)
+        self.num_outputs = 1 if len(output.shape) == 1 else output.shape[1]
+        self.bg_avg = np.average(output, axis=0)
+        self.components[FeatureSubset()] = ConstantPDDEstimator(self.bg_avg)
 
         # Model the selected subsets in parallel by cardinality
         fs_size = 1
         cur_subsets = [fs for fs in feature_sets if len(fs) == fs_size]
         while len(cur_subsets) > 0:
             print("Fitting components of size", fs_size, "...")
-            Parallel(n_jobs=n_jobs)(
+            fitted_estimators = Parallel(n_jobs=n_jobs)(
                 delayed(self._fit_component)(background_data, fs)
                 for fs in tqdm(cur_subsets)
             )
+            for fs, estimator in zip(cur_subsets, fitted_estimators):
+                self.components[fs] = estimator
             fs_size += 1
             cur_subsets = [fs for fs in feature_sets if len(fs) == fs_size]
 
-    def _fit_component(self, background_data: npt.NDArray, feature_set: FeatureSubset):
+    def _fit_component(
+        self, background_data: npt.NDArray, feature_set: FeatureSubset
+    ) -> PDDEstimator:
+        """
+        Fit an estimator for `feature_set` against the residual partial
+        dependence left after subtracting every already-fitted strict-subset
+        component. Kept as a separate method (rather than inlined in `fit()`)
+        so it can be passed to `joblib.Parallel` for parallel fitting of
+        same-cardinality subsets.
+        """
         # All subcomponents are necessary to compute the values
         # for this component
         subcomponents = {
@@ -108,16 +134,44 @@ class PartialDependenceDecomposition:
             for k, v in self.components.items()
             if all(feat in feature_set for feat in k)
         }
-        component = PDDComponent(
-            feature_set,
-            self.data_signature,
-            self.collocation_method,
-            self.conditioning_method,
-            self.estimator_type,
-            self.est_kwargs,
+
+        # Collocation points are the points where we compute partial dependence
+        collocation_points = self.collocation_method.get_collocation_points(
+            feature_set.extract_columns(background_data)
         )
-        component.fit(background_data, self.model, subcomponents)
-        self.components[feature_set] = component
+
+        # For each collocation point, get partial dependence at this point
+        # Shape: (num_rows, num_outputs)
+        partial_dependence = np.average(
+            np.array(
+                [
+                    self.conditioning_method.conditional_expectation(
+                        feature_set, collocation_point, self.model
+                    )
+                    for collocation_point in collocation_points
+                ]
+            ),
+            axis=1,
+        )
+
+        # Subtract strict subcomponents' outputs from partial dependence.
+        # The result is the estimated output for the functional component
+        full_width_collocation_points = feature_set.expand_columns(
+            collocation_points, background_data.shape[1]
+        )
+        for subset, estimator in subcomponents.items():
+            partial_dependence -= estimator(
+                subset.extract_columns(full_width_collocation_points)
+            )
+
+        # Fit an estimator on the resulting values
+        categories = self.data_signature.get_categories(feature_set)
+        if np.max(partial_dependence) - np.min(partial_dependence) < 1e-3:
+            # If the partial dependence is constant, don't fit an estimator
+            return ConstantPDDEstimator(categories, feature_set, partial_dependence[0])
+        estimator = self.est_constructor(categories, feature_set, **self.est_kwargs)
+        estimator.fit(collocation_points, partial_dependence)
+        return estimator
 
     def __call__(self, data: pd.DataFrame | npt.NDArray):
         """
@@ -157,7 +211,8 @@ class PartialDependenceDecomposition:
             (num_rows, num_outputs).
         """
         return {
-            subset: component(data) for subset, component in self.components.items()
+            subset: estimator(subset.extract_columns(data))
+            for subset, estimator in self.components.items()
         }
 
     def _asv_coefficients(
