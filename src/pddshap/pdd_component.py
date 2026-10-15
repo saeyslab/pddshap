@@ -34,12 +34,20 @@ class PDDComponent:
     def _compute_partial_dependence(self, coordinates: npt.NDArray,
                                     model: Callable[[npt.NDArray], npt.NDArray]):
         """
-        Compute partial dependence of this component at a given point.
-        :param coordinates: The points at which we compute the partial dependence. Shape: (num_features,)
-        :param background_distribution: The background distribution to estimate the integral.
-            Shape: (-1, num_features)
-        :param model: The model of which we want to compute the partial dependence
-        :return: Partial dependence at x. Shape: (num_outputs,)
+        Compute the partial dependence of this component at given points.
+
+        Parameters
+        ----------
+        coordinates : numpy.ndarray of shape (num_rows, num_features)
+            The points at which we compute the partial dependence, in this
+            component's own feature subset.
+        model : callable
+            The model of which we want to compute the partial dependence.
+
+        Returns
+        -------
+        numpy.ndarray of shape (num_rows, num_outputs)
+            Partial dependence at each point.
         """
         return np.average(np.array([
             self.conditioning_method.conditional_expectation(self.feature_subset, row, model)
@@ -49,11 +57,18 @@ class PDDComponent:
     def fit(self, data: npt.NDArray, model: Callable[[np.ndarray], np.ndarray],
             subcomponents: Dict[FeatureSubset, Union["PDDComponent", "ConstantPDDComponent"]]):
         """
+        Fit this component against the residual partial dependence left
+        after subtracting every already-fitted strict-subset component.
 
-        :param data: [n, num_features]
-        :param model:
-        :param subcomponents:
-        :return:
+        Parameters
+        ----------
+        data : numpy.ndarray of shape (n, num_features)
+            Background data, in full (not subset-restricted) column space.
+        model : callable
+            The model of which we want to compute the partial dependence.
+        subcomponents : dict of FeatureSubset to PDDComponent or ConstantPDDComponent
+            Every already-fitted component whose feature subset is a strict
+            subset of `self.feature_subset`.
         """
 
         # Define coordinates at which we compute the integral
@@ -80,10 +95,20 @@ class PDDComponent:
 
     def __call__(self, data: pd.DataFrame | npt.NDArray) -> npt.NDArray:
         """
-        Computes this component's output on the given data.
-        Note: all columns must be passed in the data. The method extracts the relevant columns.
-        :param data: Shape: (num_rows, len(self.data_signature.feature_names)
-        :return: Shape: (data.shape[0], self.num_outputs)
+        Compute this component's output on the given data.
+
+        Note: all columns must be passed in `data` — the method extracts the
+        relevant columns itself.
+
+        Parameters
+        ----------
+        data : pandas.DataFrame or numpy.ndarray of shape (num_rows, len(self.data_signature.feature_names))
+            Full-width input data.
+
+        Returns
+        -------
+        numpy.ndarray of shape (num_rows, self.num_outputs)
+            This component's output at each row.
         """
         if self.estimator is None:
             raise Exception("PDPComponent is not fitted yet")

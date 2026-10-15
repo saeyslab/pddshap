@@ -9,11 +9,20 @@ from sklearn.metrics import r2_score
 
 def compare_values(reference: npt.NDArray, approx: npt.NDArray) -> dict[str, float]:
     """
-    Compare an array of approximate values (e.g. PDD-SHAP values, or predictions)
-    against a reference array of the same shape (e.g. ground-truth or baseline-explainer
-    values), flattening both before computing summary statistics.
+    Compare an array of approximate values against a reference array of the
+    same shape, flattening both before computing summary statistics.
 
-    :return: dict with keys "r2", "pearson", "spearman".
+    Parameters
+    ----------
+    reference : numpy.ndarray
+        Ground-truth or baseline-explainer values.
+    approx : numpy.ndarray of the same shape as `reference`
+        Approximate values to compare, e.g. PDD-SHAP values or predictions.
+
+    Returns
+    -------
+    dict of str to float
+        Summary statistics with keys "r2", "pearson", "spearman".
     """
     ref_flat = np.asarray(reference).ravel()
     approx_flat = np.asarray(approx).ravel()
@@ -29,7 +38,23 @@ def compare_values(reference: npt.NDArray, approx: npt.NDArray) -> dict[str, flo
 
 
 def time_call(fn: Callable[..., Any], *args, **kwargs) -> tuple[Any, float]:
-    """Call ``fn(*args, **kwargs)``, returning ``(result, elapsed_seconds)``."""
+    """
+    Call `fn(*args, **kwargs)`, timing the call.
+
+    Parameters
+    ----------
+    fn : callable
+        Function to call and time.
+    *args
+        Positional arguments passed to `fn`.
+    **kwargs
+        Keyword arguments passed to `fn`.
+
+    Returns
+    -------
+    tuple of (Any, float)
+        `fn`'s return value, and the elapsed wall-clock time in seconds.
+    """
     start = time.time()
     result = fn(*args, **kwargs)
     return result, time.time() - start

@@ -12,21 +12,36 @@ from ..util import Model
 class MultilinearPolynomial(Model):
     def __init__(self, num_features: int, coefficients: Dict[FeatureSubset, float]):
         """
-        Initialize the multilinear polynomial with a given number of features and coefficients
-        :param num_features: Total number of input features.
-        :param coefficients: Dictionary mapping tuples of integers (representing a subset of features) to the
-            coefficient (float) of the corresponding monomial.
+        Initialize the multilinear polynomial with a given number of features
+        and coefficients.
+
+        Parameters
+        ----------
+        num_features : int
+            Total number of input features.
+        coefficients : dict of FeatureSubset to float
+            Maps a subset of features to the coefficient of the corresponding
+            monomial.
         """
         self.num_features = num_features
         self.coefficients = coefficients
 
     def shapley_values(self, data: npt.NDArray):
         """
-        Computes closed form Shapley values for inputs given by data.
-        This assumes that the input features are centered around 0 and independently distributed.
+        Compute closed-form Shapley values for inputs given by `data`.
 
-        :param data: NDArray, shape: (num_rows, self.num_features)
-        :return: NDArray, shape: (num_rows, self.num_features)
+        This assumes that the input features are centered around 0 and
+        independently distributed.
+
+        Parameters
+        ----------
+        data : numpy.ndarray of shape (num_rows, self.num_features)
+            Input data.
+
+        Returns
+        -------
+        numpy.ndarray of shape (num_rows, self.num_features)
+            Shapley values for each row and feature.
         """
         result = np.zeros_like(data)
         for term in self.coefficients:
@@ -36,9 +51,13 @@ class MultilinearPolynomial(Model):
 
     def variance(self):
         """
-        Computes the theoretical variance of the polynomial,
-        under the assumption that all input features are zero-centered with variance 1.
-        :return: The theoretical variance (float)
+        Compute the theoretical variance of the polynomial, under the
+        assumption that all input features are zero-centered with variance 1.
+
+        Returns
+        -------
+        float
+            The theoretical variance.
         """
         result = 0.
         for term in self.coefficients:
@@ -48,10 +67,13 @@ class MultilinearPolynomial(Model):
 
     def mean(self):
         """
-        Returns the theoretical mean of the polynomial,
-        under the assumption that all input features are zero-centered.
-        This is just the bias.
-        :return: The theoretical mean (float)
+        Compute the theoretical mean of the polynomial, under the assumption
+        that all input features are zero-centered. This is just the bias.
+
+        Returns
+        -------
+        float
+            The theoretical mean.
         """
         if () in self.coefficients:
             return self.coefficients[()]
@@ -59,9 +81,17 @@ class MultilinearPolynomial(Model):
 
     def __call__(self, data: npt.NDArray):
         """
-        Computes the output of the multilinear polynomial for the given input data
-        :param data: NDArray, shape: (num_rows, self.num_features)
-        :return: NDArray, shape: (num_rows)
+        Compute the output of the multilinear polynomial for the given input data.
+
+        Parameters
+        ----------
+        data : numpy.ndarray of shape (num_rows, self.num_features)
+            Input data.
+
+        Returns
+        -------
+        numpy.ndarray of shape (num_rows,)
+            Polynomial output for each row.
         """
         assert(data.shape[1] == self.num_features)
         output = np.zeros(shape=(data.shape[0]))
@@ -91,16 +121,22 @@ class RandomMultilinearPolynomial(MultilinearPolynomial):
     def __init__(self, num_features: int, num_terms: List[Union[int, float]],
                  coefficient_generator: Callable[[], float] | None = None):
         """
-        Arguments:
-            num_features: total amount of input features
-            num_terms: List containing the number/fraction of terms of each order.
-                Example: order_terms[3] = the number of desired third-order terms.
-                If order_terms[k] is -1, then all k-order terms are included.
-                If len(order_terms) < num_features, then all entries between len(order_terms) and num_features
-                are assumed to be 0.
-                Example: if len(order_terms) == 3, we will only have a bias, univariate and bivariate terms.
-                If order_terms[k] is a float between 0 and 1, it is interpreted as a relative amount:
-                the fraction of all possible interactions.
+        Parameters
+        ----------
+        num_features : int
+            Total number of input features.
+        num_terms : list of int or float
+            Number/fraction of terms of each order. `num_terms[k]` is the
+            number of desired order-`k` terms. If `num_terms[k]` is -1, all
+            order-`k` terms are included. If `len(num_terms) < num_features`,
+            all entries between `len(num_terms)` and `num_features` are
+            assumed to be 0 (e.g. `len(num_terms) == 3` means only a bias,
+            univariate, and bivariate terms are generated). If `num_terms[k]`
+            is a float between 0 and 1, it is interpreted as the fraction of
+            all possible order-`k` interactions.
+        coefficient_generator : callable, optional
+            Zero-argument callable returning a random coefficient. Defaults
+            to `numpy.random.normal`.
         """
         coefficient_generator = coefficient_generator if coefficient_generator is not None else np.random.normal
         coefficients: Dict[Tuple, float] = {}

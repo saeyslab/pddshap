@@ -7,7 +7,21 @@ from ..signature.feature_subset import FeatureSubset
 def random_partial_ordering(
     num_elements: int, rng: np.random.Generator
 ) -> list[list[int]]:
-    """Create a random partial ordering as a list of variable-length feature groups."""
+    """
+    Create a random partial ordering as a list of variable-length feature groups.
+
+    Parameters
+    ----------
+    num_elements : int
+        Number of features to order.
+    rng : numpy.random.Generator
+        Random number generator used to shuffle features and group sizes.
+
+    Returns
+    -------
+    list of list of int
+        Feature groups ranked by precedence.
+    """
     shuffled = list(rng.permutation(range(num_elements)))
     groups: list[list[int]] = []
     current: list[int] = []

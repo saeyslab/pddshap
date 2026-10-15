@@ -9,8 +9,24 @@ def compute_shapley_values(
     pred_fn, X_bg: npt.NDArray, X: npt.NDArray, explainer: str
 ) -> npt.NDArray:
     """
-    Compute baseline Shapley values for ``pred_fn`` on ``X`` using one of the
-    `shap` package's explainers, normalized to shape ``(rows, features, outputs)``.
+    Compute baseline Shapley values for `pred_fn` on `X` using one of the
+    `shap` package's explainers.
+
+    Parameters
+    ----------
+    pred_fn : callable
+        Prediction function to explain.
+    X_bg : numpy.ndarray
+        Background data used by the explainer.
+    X : numpy.ndarray
+        Data to compute Shapley values for.
+    explainer : {"permutation", "kernel", "sampling"}
+        Which `shap` explainer to use.
+
+    Returns
+    -------
+    numpy.ndarray of shape (rows, features, outputs)
+        Shapley values, normalized to a consistent shape across explainers.
     """
     if explainer == "permutation":
         values = PermutationExplainer(pred_fn, X_bg)(X).values

@@ -5,8 +5,24 @@ import pandas as pd
 
 def sample_rows(df: pd.DataFrame, n: int, random_state: int, label: str | None = None) -> pd.DataFrame:
     """
-    Sample ``min(n, len(df))`` rows from ``df``, warning if fewer than ``n`` rows
-    were available (in which case all of ``df`` is returned, order permuted).
+    Sample `min(n, len(df))` rows from `df`, warning if fewer than `n` rows
+    were available (in which case all of `df` is returned, order permuted).
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Data to sample from.
+    n : int
+        Number of rows requested.
+    random_state : int
+        Random seed for sampling.
+    label : str, optional
+        Name used to identify this sample in the warning message, if any.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The sampled rows.
     """
     n_available = min(n, len(df))
     if n_available < n:

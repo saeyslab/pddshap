@@ -20,40 +20,115 @@ class DatasetSplit:
     pred_type: str
 
 
-def load(
-    name: str,
+def load_dataset(
     data_dir: str,
-    *,
-    pred_type: str | None = None,
-    data_id: int | None = None,
-    download: bool = False,
+    openml_data_id: int | None = None,
+    test_size: float = 0.2,
+    train_test_split_random_state: int = 42
 ) -> DatasetSplit:
+    """Load a train/test split for an OpenML dataset, fetching and caching it if needed.
+
+    If no cached copy of the dataset matching ``test_size`` and
+    ``train_test_split_random_state`` exists under ``data_dir``, the dataset is downloaded
+    from OpenML, cleaned, encoded, split, and cached to disk. Otherwise, the cached CSV
+    files are read directly.
+
+    Parameters
+    ----------
+    data_dir : str
+        Root directory under which cached datasets are stored, one subdirectory per
+        ``openml_data_id``.
+    openml_data_id : int or None, optional
+        The OpenML dataset ID to fetch (passed as ``data_id`` to
+        :func:`sklearn.datasets.fetch_openml`).
+    test_size : float, optional
+        Fraction of the dataset to hold out as the test set, by default 0.2.
+    train_test_split_random_state : int, optional
+        Random state used for the train/test split, by default 42.
+
+    Returns
+    -------
+    DatasetSplit
+        The train/test feature and label arrays, along with the inferred prediction
+        type (``"regression"`` or ``"classification"``).
     """
-    Load a cached dataset's train/test split as a :class:`DatasetSplit`.
+    ds_dir = os.path.join(data_dir, openml_data_id)
 
-    If ``download`` is True and the dataset isn't cached yet under ``data_dir/name``,
-    it is fetched from OpenML first (requires ``data_id`` and ``pred_type``).
-    ``pred_type`` can otherwise be omitted if the dataset was already cached (it's recorded in ``meta.json``).
-    """
-    ds_dir = os.path.join(data_dir, name)
-    cached = os.path.isfile(os.path.join(ds_dir, "X_train.csv"))
+    # If the dataset is not found under the ``data_dir``,
+    # or if it is found but the test size or random state are different,
+    # then it must be re-fetched from openml and re-split into train and test set.
+    meta_json_path = os.path.join(ds_dir, "meta.json")
+    needs_fetch = True
+    if os.path.isfile(meta_json_path):
+        with open(meta_json_path, "r") as fp:
+            meta_test_size = fp.get("test_size")
+            meta_random_state = fp.get("train_test_split_random_state")
+        if meta_test_size == test_size and meta_random_state == train_test_split_random_state:
+            needs_fetch = False
 
-    if not cached:
-        if not download:
-            raise FileNotFoundError(
-                f"Dataset '{name}' not found under {data_dir}. Pass download=True to fetch it."
+    #################################
+    # Download dataset if necessary #
+    #################################
+    if needs_fetch:
+        ds = fetch_openml(data_id=openml_data_id)
+        pred_type = "regression" if pd.api.types.is_numeric_dtype(ds["target"]) else "classification"
+        # Drop nan rows
+        y = ds.target[ds.data.notnull().all(axis=1)].to_numpy()
+        df = ds.data.dropna().reset_index(drop=True)
+        if pred_type == "classification":
+            y = LabelEncoder().fit_transform(y)
+        else:
+            y = StandardScaler().fit_transform(y.reshape(-1, 1))
+
+        col_dfs = []
+        for feat_name in df.columns:
+            if df.dtypes[feat_name] in ["object", "bool", "category"]:
+                encoder = OrdinalEncoder()
+                dtype = "int8"
+            elif df.dtypes[feat_name] in ["int64", "float64", "int32", "float32"]:
+                encoder = StandardScaler()
+                dtype = "float32"
+            else:
+                raise ValueError("Unrecognized dtype in dataframe")
+            col_dfs.append(
+                pd.DataFrame(
+                    encoder.fit_transform(df[[feat_name]]),
+                    columns=[feat_name],
+                    dtype=dtype,
+                )
             )
-        if data_id is None or pred_type is None:
-            raise ValueError(
-                f"Dataset '{name}' is not cached yet; data_id and pred_type are required to download it."
-            )
-        _fetch_and_cache(name, data_id, pred_type, data_dir)
+        df = pd.concat(col_dfs, axis=1)
 
-    resolved_pred_type = pred_type or _read_meta(ds_dir).get("pred_type")
-    if resolved_pred_type is None:
-        raise ValueError(
-            f"pred_type for '{name}' is unknown (no meta.json and none was passed in)."
+        os.makedirs(ds_dir, exist_ok=True)
+        df.to_csv(os.path.join(ds_dir, "data.csv"), index=False)
+        np.savetxt(os.path.join(ds_dir, "labels.csv"), y)
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            df, y, test_size=test_size, random_state=train_test_split_random_state
         )
+        X_train.to_csv(os.path.join(ds_dir, "X_train.csv"), index=False)
+        X_test.to_csv(os.path.join(ds_dir, "X_test.csv"), index=False)
+        np.savetxt(os.path.join(ds_dir, "y_train.csv"), y_train)
+        np.savetxt(os.path.join(ds_dir, "y_test.csv"), y_test)
+
+        with open(os.path.join(ds_dir, "meta.json"), "w") as fp:
+            json.dump({
+                "pred_type": pred_type,
+                "openml_data_id": openml_data_id,
+                "test_size": test_size,
+                "train_test_split_random_state": train_test_split_random_state
+            }, fp)
+
+        return DatasetSplit(X_train, X_test, y_train, y_test, pred_type)
+
+    ##############################################
+    # Otherwise, read the CSV files and metadata #
+    ##############################################
+    meta_json_path = os.path.join(ds_dir, "meta.json")
+    assert os.path.isfile(meta_json_path), "meta.json file missing"
+    with open(meta_json_path, "r") as fp:
+        pred_type = fp.get("pred_type")
+        assert pred_type in ("regression", "classification"), f"Invalid pred_type: {pred_type}"
 
     X_train = pd.read_csv(os.path.join(ds_dir, "X_train.csv"))
     X_test = pd.read_csv(os.path.join(ds_dir, "X_test.csv"))
@@ -62,77 +137,4 @@ def load(
     if y_train.ndim == 2 and y_train.shape[1] == 1:
         y_train = y_train.ravel()
         y_test = y_test.ravel()
-
-    return DatasetSplit(X_train, X_test, y_train, y_test, resolved_pred_type)
-
-def _read_meta(ds_dir: str) -> dict:
-    meta_path = os.path.join(ds_dir, "meta.json")
-    if not os.path.isfile(meta_path):
-        return {}
-    with open(meta_path, "r") as fp:
-        return json.load(fp)
-
-
-def _fetch_and_cache(
-    name: str, data_id: int, pred_type: str, data_dir: str, test_size: float = 0.2, random_state: int = 42
-) -> None:
-    """
-    Download a dataset from OpenML, encode it (ordinal-encode categorical columns,
-    standard-scale numerical ones and the regression target), split it into train/test,
-    and cache everything under ``data_dir/name``.
-
-    Writes ``data.csv``/``labels.csv`` (the full encoded dataset), a train/test split
-    (``X_train.csv``, ``X_test.csv``, ``y_train.csv``, ``y_test.csv``), and ``meta.json``
-    (``{"pred_type": ...}``) so later calls to :func:`pddshap.datasets.load` don't need
-    ``pred_type`` repeated.
-
-    :param name: name under which to cache the dataset (``data_dir/name/...``).
-    :param data_id: OpenML dataset id to fetch.
-    :param pred_type: ``"classification"`` or ``"regression"``.
-    :param data_dir: root directory under which datasets are cached.
-    """
-    ds_dir = os.path.join(data_dir, name)
-
-    ds = fetch_openml(data_id=data_id)
-    # Drop nan rows
-    y = ds.target[ds.data.notnull().all(axis=1)].to_numpy()
-    df = ds.data.dropna().reset_index(drop=True)
-    if pred_type == "classification":
-        y = LabelEncoder().fit_transform(y)
-    else:
-        y = StandardScaler().fit_transform(y.reshape(-1, 1))
-
-    col_dfs = []
-    for feat_name in df.columns:
-        if df.dtypes[feat_name] in ["object", "bool", "category"]:
-            encoder = OrdinalEncoder()
-            dtype = "int8"
-        elif df.dtypes[feat_name] in ["int64", "float64", "int32", "float32"]:
-            encoder = StandardScaler()
-            dtype = "float32"
-        else:
-            raise ValueError("Unrecognized dtype in dataframe")
-        col_dfs.append(
-            pd.DataFrame(
-                encoder.fit_transform(df[[feat_name]]),
-                columns=[feat_name],
-                dtype=dtype,
-            )
-        )
-    df = pd.concat(col_dfs, axis=1)
-
-    os.makedirs(ds_dir, exist_ok=True)
-    df.to_csv(os.path.join(ds_dir, "data.csv"), index=False)
-    np.savetxt(os.path.join(ds_dir, "labels.csv"), y)
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        df, y, test_size=test_size, random_state=random_state
-    )
-    X_train.to_csv(os.path.join(ds_dir, "X_train.csv"), index=False)
-    X_test.to_csv(os.path.join(ds_dir, "X_test.csv"), index=False)
-    np.savetxt(os.path.join(ds_dir, "y_train.csv"), y_train)
-    np.savetxt(os.path.join(ds_dir, "y_test.csv"), y_test)
-
-    with open(os.path.join(ds_dir, "meta.json"), "w") as fp:
-        json.dump({"pred_type": pred_type}, fp)
-
+    return DatasetSplit(X_train, X_test, y_train, y_test, pred_type)

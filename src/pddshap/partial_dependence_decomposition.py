@@ -43,19 +43,27 @@ class PartialDependenceDecomposition:
         n_jobs: int = 1,
     ) -> None:
         """
-        Fit the partial dependence decomposition using a given
-        background dataset.
+        Fit the partial dependence decomposition using a given background dataset.
 
-        :param training_data: Full training dataset. 
-            Only used to extract data signature (valid categories for onehot encoding)
-        :param background_data: Background dataset
-        :param max_size: Maximal size of subsets to be modeled.
-            If None, max_size will be set to the number of features.
-        :param kmeans: If not None, the background data will be clustered
-            using k-means with the given number of clusters before fitting.
-        :param feature_sets: If not None, all subsets in this dictionary will
-            be modeled. The keys of the dictionary should be the sizes of
-            the subsets, and the values should be lists of FeatureSubset objects.
+        Parameters
+        ----------
+        training_data : pandas.DataFrame or numpy.ndarray
+            Full training dataset. Only used to extract the data signature
+            (valid categories for one-hot encoding).
+        background_data : pandas.DataFrame or numpy.ndarray
+            Background dataset.
+        max_size : int, optional
+            Maximal size of subsets to be modeled. If None, `max_size` will be
+            set to the number of features.
+        feature_sets : list of FeatureSubset, optional
+            If not None, all subsets in this list will be modeled instead of
+            enumerating subsets up to `max_size`.
+        kmeans : int, optional
+            If not None, the background data will be clustered using k-means
+            with the given number of clusters before fitting.
+        n_jobs : int, default 1
+            Number of parallel jobs used to fit components of the same
+            cardinality.
         """
 
         # Argument checking and preprocessing
@@ -117,9 +125,17 @@ class PartialDependenceDecomposition:
 
     def __call__(self, data: pd.DataFrame | npt.NDArray):
         """
-        Compute the output of the decomposition at the given coordinates
-        :param data: The coordinates where we evaluate the model
-        :return: The output of the decomposition at each coordinate.
+        Compute the output of the decomposition at the given coordinates.
+
+        Parameters
+        ----------
+        data : pandas.DataFrame or numpy.ndarray
+            The coordinates where we evaluate the model.
+
+        Returns
+        -------
+        numpy.ndarray
+            The output of the decomposition at each coordinate.
         """
         if isinstance(data, pd.DataFrame):
             data = data.values
@@ -131,10 +147,18 @@ class PartialDependenceDecomposition:
 
     def evaluate(self, data: npt.NDArray) -> dict[FeatureSubset, npt.NDArray]:
         """
-        Evaluate PDP decomposition at all rows in data
-        :param data: [num_rows, num_features]
-        :return: Dictionary containing each component function value:
-            {FeatureSubset, npt.NDArray[num_rows, num_outputs]}
+        Evaluate the PDP decomposition at all rows in `data`.
+
+        Parameters
+        ----------
+        data : numpy.ndarray of shape (num_rows, num_features)
+            Input data.
+
+        Returns
+        -------
+        dict of FeatureSubset to numpy.ndarray
+            Each component function's value, as an array of shape
+            (num_rows, num_outputs).
         """
         return {
             subset: component(data) for subset, component in self.components.items()
@@ -161,13 +185,24 @@ class PartialDependenceDecomposition:
         partial_ordering: list[list[int | str]] | None = None,
     ) -> npt.NDArray:
         """
-        Compute Shapley values for each row in data.
-        :param data: DataFrame or NDArray, shape: (num_rows, self.num_features)
-        :param project: Boolean value indicating if the results should be
-            orthogonally projected to the hyperplane satisfying the
-            Efficiency axiom.
-        :return: NDArray containing Shapley values for each row and each output.
-            Shape: (num_rows, self.num_features, num_outputs)
+        Compute Shapley values for each row in `data`.
+
+        Parameters
+        ----------
+        data : pandas.DataFrame or numpy.ndarray of shape (num_rows, num_features)
+            Input data.
+        project : bool, default False
+            Whether the results should be orthogonally projected onto the
+            hyperplane satisfying the efficiency axiom.
+        partial_ordering : list of list of int or str, optional
+            Groups of features ranked by precedence, used to compute
+            asymmetric Shapley values. If None, symmetric Shapley values are
+            computed.
+
+        Returns
+        -------
+        numpy.ndarray of shape (num_rows, num_features, num_outputs)
+            Shapley values for each row and each output.
         """
         assert self.data_signature is not None, (
             "Must fit model before computing Shapley values"

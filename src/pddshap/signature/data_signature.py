@@ -9,24 +9,30 @@ from .feature_subset import FeatureSubset
 
 
 class DataSignature:
+    """
+    Keep track of feature names, which features are numerical or categorical,
+    and for categorical features, the possible values they can take.
+
+    If the passed dataframe is a numpy array, an extra collection of integers
+    is required to specify which columns should be treated as categorical. If
+    the dataframe is a pandas DataFrame, the feature names are taken from the
+    column names and the categorical features are inferred from the data
+    types of the columns.
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame or numpy.ndarray
+        The data to extract the signature from.
+    categorical_features : Collection of int, optional
+        A collection of integers indicating the categorical variables
+        (ignored if `dataframe` is a pandas DataFrame).
+    """
+
     def __init__(
         self,
         dataframe: pd.DataFrame | npt.NDArray,
         categorical_features: Collection[int] | None = None,
     ):
-        """
-        The DataSignature class keeps track of feature names, which features are numerical or categorical,
-        and for categorical features, the possible values they can take.
-
-        If the passed dataframe is a numpy array, an extra collection of integers is required to specify
-        which columns should be treated as categorical.
-        If the dataframe is a Pandas DataFrame, the feature names are taken from the column names and the categorical features are inferred
-        from the data types of the columns.
-
-        :param dataframe: the data to extract the signature from
-        :param categorical_features: a collection of integers indicating the categorical variables
-            (ignored if dataframe is a pandas DataFrame).
-        """
         self.feature_names: tuple[str, ...]
         self.num_features: int
         self.categories: dict[int, list[int]] = {}

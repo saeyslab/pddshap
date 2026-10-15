@@ -24,5 +24,19 @@ def make_model(pred_type: str, name: str, **kwargs):
 
 
 def predict_fn(model, pred_type: str) -> Callable:
-    """The right prediction method to explain for a given problem type."""
+    """
+    The right prediction method to explain for a given problem type.
+
+    Parameters
+    ----------
+    model : object
+        A fitted scikit-learn-compatible estimator.
+    pred_type : {"classification", "regression"}
+        Problem type.
+
+    Returns
+    -------
+    callable
+        `model.predict_proba` for classification, `model.predict` otherwise.
+    """
     return model.predict_proba if pred_type == "classification" else model.predict

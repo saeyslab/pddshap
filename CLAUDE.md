@@ -17,37 +17,56 @@ orderings (see `experiments/reuse_decomposition/`) without refitting.
 This project uses `uv` (package manager + build backend, see `uv.lock`), Python >= 3.13.
 
 ```bash
-# install (editable, including the dev group: h5py, matplotlib, shap, seaborn, numba, ipython, pyyaml)
+# install (editable, including the dev group: pytest, matplotlib, seaborn, numba, ipython,
+# ipykernel, nbconvert, plus the `experiments` extra: h5py, pyyaml, shap)
 uv sync
 # or: pip install -e .[dev]
 ```
 
-There is no test runner/CI configured (no pytest config, no `.github/workflows`). Files under
-`test/` are standalone scripts with a `if __name__ == "__main__":` block that print
-correlation/R² comparisons against ground truth rather than asserting; run them directly:
+There is no CI configured (no `.github/workflows`), but there is a real pytest suite under
+`test/`: `conftest.py` holds shared fixtures (a quadratic ground-truth model/data split, and a
+`fitted_decomposition` fixture parametrized over the `knn`/`forest`/`tree` estimators), and
+`test_fit.py` / `test_reconstruction.py` / `test_shapley_values.py` /
+`test_asymmetric_shapley_values.py` assert against it (R², Pearson correlation vs. ground-truth
+Shapley values, the efficiency axiom, expected component counts). Run with:
 
 ```bash
-uv run python test/test_partial_dependence_decomposition.py
+uv run pytest
 ```
 
-Ground truth in tests comes from `test/multilinear_polynomial.py`, which implements an exact
-multilinear polynomial model with a closed-form Shapley value solution — this is the only
-model type simple enough to have known-correct component functions and Shapley values, so it's
-the thing PDD-SHAP's output is checked against.
+Ground truth comes from `RandomMultilinearPolynomial`
+(`src/pddshap/experiments/synthetic.py`, imported via `pddshap.experiments`) — an exact
+multilinear polynomial model with a closed-form Shapley value solution. It's the only model
+type simple enough to have known-correct component functions and Shapley values, so it's the
+thing PDD-SHAP's output is checked against.
 
 ### Experiments
 
-Experiments live under `experiments/` and read YAML config (`experiments/config/config.yaml`
-for shared data/output dirs, `experiments/config/datasets.yaml` for per-dataset OpenML IDs and
-problem type, plus a per-experiment `config.yaml`). Datasets are pre-downloaded CSVs under
-`data/<dataset>/`. Run an experiment script directly, e.g.:
+`src/pddshap/experiments/` (installed via the `experiments` extra) is a library subpackage of
+helpers consumed by experiment scripts: `datasets.py` (download/cache an OpenML split as
+`DatasetSplit`), `models.py` (`MODEL_REGISTRY` of sklearn knn/gradient-boosting models per
+problem type), `baselines.py` (wraps `shap`'s Permutation/Kernel/Sampling explainers as a
+uniform baseline), `config.py` (`load_experiment_config` merges
+`experiments/config/config.yaml` + `experiments/config/datasets.yaml` with a per-experiment
+`config.yaml`), `io.py` (save/load predictions and Shapley values), and `subsample.py`
+(`sample_rows`). This is distinct from the top-level `experiments/` directory, which holds the
+runnable scripts themselves plus config/data:
 
-```bash
-uv run python experiments/reuse_decomposition/run_experiment.py
-```
+- `experiments/train_models.py` — downloads/caches each configured dataset and trains+pickles
+  the registered models on it.
+- `experiments/compute_shap.py` — computes baseline Shapley values for those trained models
+  using `shap`'s explainers.
+- `experiments/reuse_decomposition/run_experiment.py` — fits one `PartialDependenceDecomposition`
+  and reuses it to produce PDD-SHAP values both with and without a random partial ordering,
+  demonstrating the point of `reuse_decomposition` (see its `README.md`).
 
-See `experiments/README.md` and `experiments/reuse_decomposition/README.md` for the
-prerequisites → experiment → evaluate workflow and what each experiment demonstrates.
+Datasets/models are cached under the `data_dir` from `experiments/config/config.yaml`.
+**Known issue:** `train_models.py`, `compute_shap.py`, and `reuse_decomposition/run_experiment.py`
+currently `from pddshap.datasets import load`, but that module doesn't exist — it's
+`pddshap.experiments.datasets` (re-exported as `pddshap.experiments.load`). These scripts are
+presently broken (`ModuleNotFoundError`) until that import is fixed; `experiments/README.md`
+is also stale — it describes an older `prerequisites.py`/`experiment.py`/`evaluate.py` workflow
+that no longer exists.
 
 ## Architecture
 

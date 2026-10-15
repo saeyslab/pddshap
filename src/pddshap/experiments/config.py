@@ -14,17 +14,25 @@ def _find_experiments_root(start: Path) -> Path:
 
 def load_experiment_config(experiment_dir: str | Path) -> dict:
     """
-    Load an experiment's configuration by merging, in increasing order of precedence:
-    the shared ``experiments/config/config.yaml``, and (if present and distinct) a
-    ``config.yaml`` local to ``experiment_dir``.
+    Load an experiment's configuration by merging, in increasing order of
+    precedence: the shared `experiments/config/config.yaml`, and (if present
+    and distinct) a `config.yaml` local to `experiment_dir`.
 
-    ``experiments/config/datasets.yaml`` is attached under the ``"datasets"`` key rather
-    than merged in, since it's a name -> {data_id, pred_type} mapping rather than
-    scalar settings.
+    `experiments/config/datasets.yaml` is attached under the `"datasets"` key
+    rather than merged in, since it's a name -> {data_id, pred_type} mapping
+    rather than scalar settings.
 
-    :param experiment_dir: directory of the calling experiment script
-        (typically ``Path(__file__).parent``). The shared config root is found by
-        walking up from here.
+    Parameters
+    ----------
+    experiment_dir : str or pathlib.Path
+        Directory of the calling experiment script (typically
+        `Path(__file__).parent`). The shared config root is found by walking
+        up from here.
+
+    Returns
+    -------
+    dict
+        Merged configuration, with dataset settings under the `"datasets"` key.
     """
     experiment_dir = Path(experiment_dir)
     root = _find_experiments_root(experiment_dir)
