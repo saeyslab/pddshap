@@ -17,7 +17,6 @@ class PDDComponent:
         self.data_signature = data_signature
         self.feature_subset = feature_subset
         self.estimator: Optional[PDDEstimator] = None
-        self.std = 0
         self.fitted = False
         est_constructors = {
             "tree": TreePDDEstimator,
@@ -31,28 +30,6 @@ class PDDComponent:
         self.est_kwargs = est_kwargs
         self.num_outputs = None
 
-    def _compute_partial_dependence(self, coordinates: npt.NDArray,
-                                    model: Callable[[npt.NDArray], npt.NDArray]):
-        """
-        Compute the partial dependence of this component at given points.
-
-        Parameters
-        ----------
-        coordinates : numpy.ndarray of shape (num_rows, num_features)
-            The points at which we compute the partial dependence, in this
-            component's own feature subset.
-        model : callable
-            The model of which we want to compute the partial dependence.
-
-        Returns
-        -------
-        numpy.ndarray of shape (num_rows, num_outputs)
-            Partial dependence at each point.
-        """
-        return np.average(np.array([
-            self.conditioning_method.conditional_expectation(self.feature_subset, row, model)
-            for row in coordinates
-            ]), axis=1)
 
     def fit(self, data: npt.NDArray, model: Callable[[np.ndarray], np.ndarray],
             subcomponents: Dict[FeatureSubset, Union["PDDComponent", "ConstantPDDComponent"]]):
@@ -71,16 +48,27 @@ class PDDComponent:
             subset of `self.feature_subset`.
         """
 
-        # Define coordinates at which we compute the integral
-        coords = self.collocation_method.get_collocation_points(self.feature_subset.get_columns(data))
+        # Collocation points are the points where we compute partial dependence
+        collocation_points = self.collocation_method.get_collocation_points(
+            self.feature_subset.extract_columns(data)
+        )
 
-        # For each grid value, get partial dependence and subtract proper subset components
+        # For each collocation point, get partial dependence at this point
         # Shape: (num_rows, num_outputs)
-        partial_dependence = self._compute_partial_dependence(coords, model)
+        partial_dependence = np.average(
+            np.array([
+                self.conditioning_method.conditional_expectation(self.feature_subset, collocation_point, model)
+                for collocation_point in collocation_points
+            ]
+        ), axis=1)
+
+        # Subtract strict subcomponents outputs from partial dependence
+        # The result is the estimated output for the functional component
         self.num_outputs = partial_dependence.shape[1]
         for subset, subcomponent in subcomponents.items():
             # Subtract subcomponent from partial dependence
-            partial_dependence -= subcomponent(self.feature_subset.expand_columns(coords, data.shape[1]))
+            full_width_collocation_points = self.feature_subset.expand_columns(collocation_points, data.shape[1])
+            partial_dependence -= subcomponent(full_width_collocation_points)
 
         # Fit a model on resulting values
         categories = self.data_signature.get_categories(self.feature_subset)
@@ -90,19 +78,19 @@ class PDDComponent:
         else:
             # Otherwise, fit a model
             self.estimator = self.est_constructor(categories, self.feature_subset, **self.est_kwargs)
-            self.estimator.fit(coords, partial_dependence)
+            self.estimator.fit(collocation_points, partial_dependence)
         self.fitted = True
 
-    def __call__(self, data: pd.DataFrame | npt.NDArray) -> npt.NDArray:
+    def __call__(self, data: npt.NDArray) -> npt.NDArray:
         """
         Compute this component's output on the given data.
 
-        Note: all columns must be passed in `data` — the method extracts the
-        relevant columns itself.
+        Note: all columns must be passed in `data`. 
+        The method extracts the relevant columns itself.
 
         Parameters
         ----------
-        data : pandas.DataFrame or numpy.ndarray of shape (num_rows, len(self.data_signature.feature_names))
+        data : numpy.ndarray of shape (num_rows, len(self.data_signature.feature_names))
             Full-width input data.
 
         Returns
@@ -112,9 +100,7 @@ class PDDComponent:
         """
         if self.estimator is None:
             raise Exception("PDPComponent is not fitted yet")
-        if isinstance(data, pd.DataFrame):
-            data = data.to_numpy()
-        return self.estimator(self.feature_subset.get_columns(data))
+        return self.estimator(self.feature_subset.extract_columns(data))
 
 # TODO this should be a subclass of PDDComponent, might use this for other
 # components than just the empty set
@@ -126,7 +112,7 @@ class ConstantPDDComponent:
         self.feature_subset = feature_subset
         self.data_signature = data_signature
 
-    def fit(self, data: np.ndarray, model: Callable[[npt.NDArray], npt.NDArray]):
+    def fit(self, data: npt.NDArray, model: Callable[[npt.NDArray], npt.NDArray]):
         output = model(data)
         self.num_outputs = 1 if len(output.shape) == 1 else output.shape[1]
         avg_output = np.average(output, axis=0)
@@ -135,7 +121,7 @@ class ConstantPDDComponent:
             self.feature_subset, avg_output)
         return avg_output
 
-    def __call__(self, data: np.ndarray):
+    def __call__(self, data: npt.NDArray):
         if self.estimator is not None:
             return self.estimator(data)
         raise ValueError("Evaluating component before fit()")

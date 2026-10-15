@@ -35,7 +35,6 @@ class PartialDependenceDecomposition:
 
     def fit(
         self,
-        training_data: pd.DataFrame | npt.NDArray,
         background_data: pd.DataFrame | npt.NDArray,
         max_size: int | None = None,
         feature_sets: list[FeatureSubset] | None = None,
@@ -47,9 +46,6 @@ class PartialDependenceDecomposition:
 
         Parameters
         ----------
-        training_data : pandas.DataFrame or numpy.ndarray
-            Full training dataset. Only used to extract the data signature
-            (valid categories for one-hot encoding).
         background_data : pandas.DataFrame or numpy.ndarray
             Background dataset.
         max_size : int, optional
@@ -67,7 +63,7 @@ class PartialDependenceDecomposition:
         """
 
         # Argument checking and preprocessing
-        self.data_signature = DataSignature(training_data)
+        self.data_signature = DataSignature(background_data)
         if isinstance(background_data, pd.DataFrame):
             background_data = background_data.to_numpy()
         if max_size is None:

@@ -53,7 +53,7 @@ class DataSignature:
             assert categorical_features is not None, (
                 "categorical_features must be provided for numpy arrays"
             )
-            self.feature_names = tuple(str(i) for i in range(dataframe.shape[1]))
+            self.feature_names = tuple(f"feat_{i}" for i in range(dataframe.shape[1]))
             for cat_feat in categorical_features:
                 self.categories[cat_feat] = list(np.unique(dataframe[:, cat_feat]))
         self.num_features = len(self.feature_names)

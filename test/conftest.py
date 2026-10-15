@@ -92,5 +92,5 @@ def fitted_decomposition(quadratic_model_and_data, estimator_config):
         estimator_type=estimator_config["estimator_type"],
         est_kwargs=estimator_config["est_kwargs"],
     )
-    decomposition.fit(X_train, X_train, max_size=2)
+    decomposition.fit(X_train, max_size=2)
     return decomposition

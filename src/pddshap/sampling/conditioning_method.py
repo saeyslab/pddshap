@@ -16,8 +16,8 @@ from typing import Callable
 
 
 class ConditioningMethod:
-    def __init__(self, train_data: npt.NDArray, **kwargs) -> None:
-        self.train_data = train_data
+    def __init__(self, background_data: npt.NDArray, **kwargs) -> None:
+        self.train_data = background_data
     
     @abstractmethod
     def _conditional_expectation(self,
@@ -50,7 +50,7 @@ class IndependentConditioningMethod(ConditioningMethod):
                                  value: npt.NDArray,
                                  model: Callable[[npt.NDArray], npt.NDArray], 
                                  **kwargs) -> npt.NDArray:
-        return model(feature_subset.project(self.train_data, value))
+        return model(feature_subset.overwrite(self.train_data, value))
 
 
 class GaussianConditioningMethod(ConditioningMethod):

@@ -6,20 +6,18 @@ class FeatureSubset:
     def __init__(self, *features: int):
         self._features = frozenset(features) if features is not None else frozenset()
 
-    def project(self, data: npt.NDArray, values: npt.NDArray) -> npt.NDArray:
+    def overwrite(self, data: npt.NDArray, values: npt.NDArray) -> npt.NDArray:
         """
-        Project the rows in `data` to the hyperplane defined by `values`.
-
-        In practice, this just overwrites the columns corresponding to this
+        Overwrite the columns corresponding to this
         feature subset using the given values. Can be used to compute the
         partial dependence at a given point for this feature subset.
 
         Parameters
         ----------
         data : numpy.ndarray of shape (-1, total_num_features)
-            Data to be projected.
+            Data to be modified.
         values : numpy.ndarray of shape (len(self.features),)
-            Values to project the data to.
+            Values to overwrite the data columns with.
 
         Returns
         -------
@@ -35,7 +33,7 @@ class FeatureSubset:
         data_copy[:, sorted(tuple(self._features))] = values
         return data_copy
 
-    def get_columns(self, data: npt.NDArray) -> npt.NDArray:
+    def extract_columns(self, data: npt.NDArray) -> npt.NDArray:
         """
         Extract the columns in `data` that correspond to this feature subset.
 
