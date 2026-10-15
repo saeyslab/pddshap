@@ -1,31 +1,20 @@
 from itertools import combinations
 
+from typing import Type
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from numpy import typing as npt
-from sklearn import cluster
+from sklearn.base import RegressorMixin
 from tqdm import tqdm
 
 from .estimator import (
     ConstantPDDEstimator,
-    GaussianProcessPDDEstimator,
-    GradientBoostingPDDEstimator,
-    KNNPDDEstimator,
     PDDEstimator,
-    TreePDDEstimator,
 )
 from .sampling import CollocationMethod, ConditioningMethod
 from .signature import DataSignature, FeatureSubset
 from .util import Model, SimplePartialOrdering
-
-EST_CONSTRUCTORS = {
-    "tree": TreePDDEstimator,
-    "forest": GradientBoostingPDDEstimator,
-    "knn": KNNPDDEstimator,
-    "gp": GaussianProcessPDDEstimator,
-}
-
 
 class PartialDependenceDecomposition:
     def __init__(
@@ -33,26 +22,27 @@ class PartialDependenceDecomposition:
         model: Model,
         collocation_method: CollocationMethod,
         conditioning_method: ConditioningMethod,
-        estimator_type: str,
-        est_kwargs=None,
+        regressor_type: Type[RegressorMixin],
+        regressor_kwargs: dict or None = None,
+        use_onehot: bool = False
     ) -> None:
         self.model = model
-        self.components: dict[FeatureSubset, PDDEstimator] = {}
         self.collocation_method = collocation_method
         self.conditioning_method = conditioning_method
-        self.est_constructor = EST_CONSTRUCTORS[estimator_type]
-        self.est_kwargs = est_kwargs if est_kwargs is not None else {}
-        self.data_signature: DataSignature | None = None
+        self.regressor_type = regressor_type
+        self.regressor_kwargs = regressor_kwargs if regressor_kwargs is not None else {}
+        self.use_onehot = use_onehot
 
+        self.data_signature: DataSignature | None = None
+        self.components: dict[FeatureSubset, PDDEstimator] = {}
         self.bg_avg = None
         self.num_outputs = None
 
     def fit(
         self,
-        background_data: pd.DataFrame | npt.NDArray,
+        X_train: pd.DataFrame | npt.NDArray,
         max_size: int | None = None,
         feature_sets: list[FeatureSubset] | None = None,
-        kmeans: int | None = None,
         n_jobs: int = 1,
     ) -> None:
         """
@@ -60,32 +50,25 @@ class PartialDependenceDecomposition:
 
         Parameters
         ----------
-        background_data : pandas.DataFrame or numpy.ndarray
-            Background dataset.
+        X_train : pandas.DataFrame or numpy.ndarray
+            Dataset to train the PDD surrogate model on.
         max_size : int, optional
             Maximal size of subsets to be modeled. If None, `max_size` will be
             set to the number of features.
         feature_sets : list of FeatureSubset, optional
             If not None, all subsets in this list will be modeled instead of
             enumerating subsets up to `max_size`.
-        kmeans : int, optional
-            If not None, the background data will be clustered using k-means
-            with the given number of clusters before fitting.
         n_jobs : int, default 1
             Number of parallel jobs used to fit components of the same
             cardinality.
         """
 
         # Argument checking and preprocessing
-        self.data_signature = DataSignature(background_data)
-        if isinstance(background_data, pd.DataFrame):
-            background_data = background_data.to_numpy()
+        self.data_signature = DataSignature(X_train)
+        if isinstance(X_train, pd.DataFrame):
+            X_train = X_train.to_numpy()
         if max_size is None:
-            max_size = background_data.shape[1]
-        if kmeans is not None:
-            background_data = (
-                cluster.KMeans(n_clusters=kmeans).fit(background_data).cluster_centers_
-            )
+            max_size = X_train.shape[1]
 
         # Select subsets to be modeled if not provided explicitly
         if feature_sets is None:
@@ -93,12 +76,12 @@ class PartialDependenceDecomposition:
             for i in range(1, max_size + 1):
                 feature_sets += [
                     FeatureSubset(*comb)
-                    for comb in combinations(range(background_data.shape[1]), i)
+                    for comb in combinations(range(X_train.shape[1]), i)
                 ]
 
         # First, model the empty component: the model's average output over
         # the background data
-        output = self.model(background_data)
+        output = self.model(X_train)
         self.num_outputs = 1 if len(output.shape) == 1 else output.shape[1]
         self.bg_avg = np.average(output, axis=0)
         self.components[FeatureSubset()] = ConstantPDDEstimator(self.bg_avg)
@@ -109,7 +92,7 @@ class PartialDependenceDecomposition:
         while len(cur_subsets) > 0:
             print("Fitting components of size", fs_size, "...")
             fitted_estimators = Parallel(n_jobs=n_jobs)(
-                delayed(self._fit_component)(background_data, fs)
+                delayed(self._fit_component)(X_train, fs)
                 for fs in tqdm(cur_subsets)
             )
             for fs, estimator in zip(cur_subsets, fitted_estimators):
@@ -118,7 +101,7 @@ class PartialDependenceDecomposition:
             cur_subsets = [fs for fs in feature_sets if len(fs) == fs_size]
 
     def _fit_component(
-        self, background_data: npt.NDArray, feature_set: FeatureSubset
+        self, X_train: npt.NDArray, feature_set: FeatureSubset
     ) -> PDDEstimator:
         """
         Fit an estimator for `feature_set` against the residual partial
@@ -137,7 +120,7 @@ class PartialDependenceDecomposition:
 
         # Collocation points are the points where we compute partial dependence
         collocation_points = self.collocation_method.get_collocation_points(
-            feature_set.extract_columns(background_data)
+            feature_set.extract_columns(X_train)
         )
 
         # For each collocation point, get partial dependence at this point
@@ -157,10 +140,10 @@ class PartialDependenceDecomposition:
         # Subtract strict subcomponents' outputs from partial dependence.
         # The result is the estimated output for the functional component
         full_width_collocation_points = feature_set.expand_columns(
-            collocation_points, background_data.shape[1]
+            collocation_points, X_train.shape[1]
         )
-        for subset, estimator in subcomponents.items():
-            partial_dependence -= estimator(
+        for subset, regressor in subcomponents.items():
+            partial_dependence -= regressor(
                 subset.extract_columns(full_width_collocation_points)
             )
 
@@ -169,9 +152,9 @@ class PartialDependenceDecomposition:
         if np.max(partial_dependence) - np.min(partial_dependence) < 1e-3:
             # If the partial dependence is constant, don't fit an estimator
             return ConstantPDDEstimator(categories, feature_set, partial_dependence[0])
-        estimator = self.est_constructor(categories, feature_set, **self.est_kwargs)
-        estimator.fit(collocation_points, partial_dependence)
-        return estimator
+        regressor = self.regressor_type(categories, feature_set, **self.regressor_kwargs)
+        regressor.fit(collocation_points, partial_dependence)
+        return regressor
 
     def __call__(self, data: pd.DataFrame | npt.NDArray):
         """

@@ -89,8 +89,8 @@ def fitted_decomposition(quadratic_model_and_data, estimator_config):
         model,
         collocation_method=RandomSubsampleCollocation(),
         conditioning_method=IndependentConditioningMethod(X_train.to_numpy()),
-        estimator_type=estimator_config["estimator_type"],
-        est_kwargs=estimator_config["est_kwargs"],
+        regressor_type=estimator_config["estimator_type"],
+        regressor_kwargs=estimator_config["est_kwargs"],
     )
     decomposition.fit(X_train, max_size=2)
     return decomposition

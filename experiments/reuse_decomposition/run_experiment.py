@@ -63,8 +63,8 @@ if __name__ == "__main__":
         model=pred_fn,
         collocation_method=RandomSubsampleCollocation(frac=pdd_cfg["collocation_frac"]),
         conditioning_method=IndependentConditioningMethod(X_bg.to_numpy()),
-        estimator_type="knn",
-        est_kwargs={"k": 3},
+        regressor_type="knn",
+        regressor_kwargs={"k": 3},
     )
     pdd.fit(
         split.X_train, X_bg,

@@ -1,5 +1,5 @@
-from .pdd_estimator import PDDEstimator
 from .estimator_not_fitted_exception import EstimatorNotFittedException
+from .pdd_estimator import PDDEstimator
 from .constant_pdd_estimator import ConstantPDDEstimator
 from .gradient_boosting_pdd_estimator import GradientBoostingPDDEstimator
 from .gaussian_process_pdd_estimator import GaussianProcessPDDEstimator
