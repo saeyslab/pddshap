@@ -2,8 +2,6 @@
 
 import numpy as np
 
-from pddshap.signature import FeatureSubset
-
 from .conftest import NUM_FEATURES
 
 
@@ -28,16 +26,20 @@ def test_asymmetric_shapley_values_with_partial_ordering(
     # incomparable) each pick up half of their shared pairwise component on
     # top of their own main effect and interaction with feature 0.
     components = fitted_decomposition.components
+    dataset = fitted_decomposition.dataset
 
-    def evaluate(feature_subset):
-        return components[feature_subset](feature_subset.extract_columns(X_test_np))
+    def evaluate(*features):
+        feature_subset = dataset.get_subset(*features)
+        return components[feature_subset](
+            dataset.extract_columns(feature_subset, X_test_np)
+        )
 
-    c0 = evaluate(FeatureSubset(0))
-    c1 = evaluate(FeatureSubset(1))
-    c2 = evaluate(FeatureSubset(2))
-    c01 = evaluate(FeatureSubset(0, 1))
-    c02 = evaluate(FeatureSubset(0, 2))
-    c12 = evaluate(FeatureSubset(1, 2))
+    c0 = evaluate(0)
+    c1 = evaluate(1)
+    c2 = evaluate(2)
+    c01 = evaluate(0, 1)
+    c02 = evaluate(0, 2)
+    c12 = evaluate(1, 2)
 
     expected_feature_0 = c0
     expected_feature_1 = c1 + c01 + c12 / 2

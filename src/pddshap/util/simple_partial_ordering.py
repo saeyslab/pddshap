@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..signature import DataSignature
+from ..signature import Dataset
 from ..signature.feature_subset import FeatureSubset
 
 
@@ -48,9 +48,9 @@ def random_partial_ordering(
 
 class SimplePartialOrdering:
     def __init__(
-        self, structure: list[list[int]], data_signature: DataSignature
+        self, structure: list[list[int]], dataset: Dataset
     ) -> None:
-        self.data_signature = data_signature
+        self.dataset = dataset
         # Maps every feature to its corresponding group in the partial ordering
         self.feature_to_group: dict[int, list[int]] = {}
         # Maps every feature to its rank in the partial ordering
@@ -67,7 +67,7 @@ class SimplePartialOrdering:
         # Contains all features that are generally incomparable
         self.incomparable_features = [
             feature
-            for feature in range(data_signature.num_features)
+            for feature in range(dataset.num_features)
             if feature not in self.feature_to_group
         ]
 

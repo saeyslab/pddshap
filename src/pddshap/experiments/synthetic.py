@@ -5,12 +5,11 @@ import numpy as np
 from numpy import typing as npt
 from scipy import special
 
-from ..signature import FeatureSubset
 from ..util import Model
 
 
 class MultilinearPolynomial(Model):
-    def __init__(self, num_features: int, coefficients: Dict[FeatureSubset, float]):
+    def __init__(self, num_features: int, coefficients: Dict[Tuple[int, ...], float]):
         """
         Initialize the multilinear polynomial with a given number of features
         and coefficients.
@@ -19,9 +18,9 @@ class MultilinearPolynomial(Model):
         ----------
         num_features : int
             Total number of input features.
-        coefficients : dict of FeatureSubset to float
-            Maps a subset of features to the coefficient of the corresponding
-            monomial.
+        coefficients : dict of tuple of int to float
+            Maps a subset of features (as a tuple of feature indices) to the
+            coefficient of the corresponding monomial.
         """
         self.num_features = num_features
         self.coefficients = coefficients

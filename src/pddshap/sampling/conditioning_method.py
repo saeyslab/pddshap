@@ -11,13 +11,15 @@ Aas, K., Jullum, M., & Løland, A. (2019).  Explaining individual predictions
 from abc import abstractmethod
 import numpy as np
 from numpy import typing as npt
-from ..signature import FeatureSubset
+from ..signature import Dataset
+from ..signature.feature_subset import FeatureSubset
 from typing import Callable
 
 
 class ConditioningMethod:
     def __init__(self, background_data: npt.NDArray, **kwargs) -> None:
-        self.train_data = background_data
+        self.dataset = Dataset(background_data)
+        self.train_data = self.dataset.data
     
     @abstractmethod
     def _conditional_expectation(self,
@@ -45,12 +47,12 @@ class IndependentConditioningMethod(ConditioningMethod):
     the marginal distribution of the other features.
     This corresponds to off-manifold Shapley values.
     """
-    def _conditional_expectation(self, 
+    def _conditional_expectation(self,
                                  feature_subset: FeatureSubset,
                                  value: npt.NDArray,
-                                 model: Callable[[npt.NDArray], npt.NDArray], 
+                                 model: Callable[[npt.NDArray], npt.NDArray],
                                  **kwargs) -> npt.NDArray:
-        return model(feature_subset.overwrite(self.train_data, value))
+        return model(self.dataset.overwrite(feature_subset, value))
 
 
 class GaussianConditioningMethod(ConditioningMethod):

@@ -1,5 +1,5 @@
 from pddshap.estimator.pdd_estimator import PDDEstimator
-from pddshap.signature import FeatureSubset
+from pddshap.signature.feature_subset import FeatureSubset
 from typing import Dict, List
 from numpy import typing as npt
 from sklearn.gaussian_process import GaussianProcessRegressor

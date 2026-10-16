@@ -1,82 +1,13 @@
-from numpy import typing as npt
-import numpy as np
-
-
 class FeatureSubset:
+    """
+    An immutable, hashable set of feature indices. Iteration and `features`
+    always yield indices in sorted order - `Dataset` and
+    `PartialDependenceDecomposition` rely on this to keep column/value
+    arrays aligned across calls.
+    """
+
     def __init__(self, *features: int):
         self._features = frozenset(features) if features is not None else frozenset()
-
-    def overwrite(self, data: npt.NDArray, values: npt.NDArray) -> npt.NDArray:
-        """
-        Overwrite the columns corresponding to this
-        feature subset using the given values. Can be used to compute the
-        partial dependence at a given point for this feature subset.
-
-        Parameters
-        ----------
-        data : numpy.ndarray of shape (-1, total_num_features)
-            Data to be modified.
-        values : numpy.ndarray of shape (len(self.features),)
-            Values to overwrite the data columns with.
-
-        Returns
-        -------
-        numpy.ndarray of shape (-1, total_num_features)
-            Projected data.
-        """
-        # Check shapes
-        if len(data.shape) != 2:
-            raise ValueError("Invalid shape: data:", data.shape)
-        if len(values.shape) != 1:
-            raise ValueError("Invalid shape: values:", values.shape)
-        data_copy = np.copy(data)
-        data_copy[:, sorted(tuple(self._features))] = values
-        return data_copy
-
-    def extract_columns(self, data: npt.NDArray) -> npt.NDArray:
-        """
-        Extract the columns in `data` that correspond to this feature subset.
-
-        Parameters
-        ----------
-        data : numpy.ndarray of shape (-1, total_num_features)
-            Data from which to extract columns.
-
-        Returns
-        -------
-        numpy.ndarray of shape (-1, len(self.features))
-            Extracted columns.
-        """
-        if len(data.shape) != 2:
-            raise ValueError("Invalid shape: data:", data.shape)
-        return data[:, sorted(tuple(self._features))]
-
-    def expand_columns(self, data: npt.NDArray, num_cols: int) -> npt.NDArray:
-        """
-        Expand the columns in `data` to `num_cols` by zero-padding all the
-        features not in this subset.
-
-        Parameters
-        ----------
-        data : numpy.ndarray of shape (-1, len(self.features))
-            Data restricted to this feature subset's columns.
-        num_cols : int
-            Total number of columns in the expanded output; must be at least
-            `len(self.features)`.
-
-        Returns
-        -------
-        numpy.ndarray of shape (-1, num_cols)
-            Zero-padded data.
-        """
-        if num_cols < len(self.features):
-            raise ValueError(f"num_cols must be at least {len(self.features)}")
-        result = np.zeros(shape=(data.shape[0], num_cols))
-        result[:, self.features] = data
-        return result
-
-    def union(self, other: "FeatureSubset") -> "FeatureSubset":
-        return FeatureSubset(*self._features.union(other._features))
 
     def intersection(self, other: "FeatureSubset") -> "FeatureSubset":
         return FeatureSubset(*self._features.intersection(other._features))
@@ -88,7 +19,7 @@ class FeatureSubset:
         return len(self._features)
 
     def __iter__(self):
-        return iter(sorted(tuple(self._features)))
+        return iter(self.features)
 
     def __repr__(self):
         return "FeatureSubset(" + ", ".join(map(str, self.features)) + ")"
@@ -97,22 +28,7 @@ class FeatureSubset:
         return hash(self._features)
 
     def __eq__(self, other):
-        return type(other) is FeatureSubset and other.features == self.features
-
-    def __ne__(self, other):
-        return self != other
-
-    def __lt__(self, other):
-        return self.features < other.features
-
-    def __gt__(self, other):
-        return self.features > other.features
-
-    def __le__(self, other):
-        return self.features <= other.features
-
-    def __ge__(self, other):
-        return self.features >= other.features
+        return type(other) is FeatureSubset and other._features == self._features
 
     @property
     def features(self):

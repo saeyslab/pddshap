@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from numpy import typing as npt
 
-from pddshap.signature import FeatureSubset
+from pddshap.signature.feature_subset import FeatureSubset
 from typing import Dict, List, Self
 from pddshap.estimator import EstimatorNotFittedException
 from sklearn.base import RegressorMixin

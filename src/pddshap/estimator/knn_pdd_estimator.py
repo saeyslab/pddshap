@@ -4,7 +4,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import OneHotEncoder
 
 from pddshap.estimator import PDDEstimator, EstimatorNotFittedException
-from pddshap.signature import FeatureSubset
+from pddshap.signature.feature_subset import FeatureSubset
 
 
 class KNNPDDEstimator(PDDEstimator):
