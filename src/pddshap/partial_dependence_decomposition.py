@@ -96,12 +96,12 @@ class PartialDependenceDecomposition:
         else:
             subsets = [self.dataset.get_subset(*fs) for fs in feature_sets]
 
-        # First, model the empty component: the model's average output over
-        # the background data
+        # The constant term of the decomposition: the model's average output
+        # over the background data. Every component is fitted against the
+        # partial dependence relative to this baseline (see `_fit_component`).
         output = self.model(self.dataset.data)
         self.num_outputs = 1 if len(output.shape) == 1 else output.shape[1]
         self.bg_avg = np.average(output, axis=0)
-        self.components[FeatureSubset()] = ConstantPDDEstimator(self.bg_avg)
 
         # Model the selected subsets in parallel by cardinality
         fs_size = 1
@@ -152,8 +152,10 @@ class PartialDependenceDecomposition:
             axis=1,
         )
 
-        # Subtract strict subcomponents' outputs from partial dependence.
-        # The result is the estimated output for the functional component
+        # Subtract the constant term and every strict subcomponent's output
+        # from the partial dependence. The result is the estimated output for
+        # the functional component.
+        partial_dependence -= self.bg_avg
         full_width_collocation_points = self.dataset.expand_columns(
             feature_set, collocation_points
         )
@@ -183,19 +185,23 @@ class PartialDependenceDecomposition:
         Returns
         -------
         numpy.ndarray
-            The output of the decomposition at each coordinate.
+            The output of the decomposition at each coordinate: the constant
+            term plus every fitted component's contribution.
         """
         if isinstance(data, pd.DataFrame):
             data = data.values
         pdp_values = self.evaluate(data)
-        result = np.zeros(shape=(data.shape[0], self.num_outputs))
+        result = np.tile(self.bg_avg, (data.shape[0], 1))
         for values in pdp_values.values():
             result += values
         return result
 
     def evaluate(self, data: npt.NDArray) -> dict[FeatureSubset, npt.NDArray]:
         """
-        Evaluate the PDP decomposition at all rows in `data`.
+        Evaluate the PDP decomposition's fitted components at all rows in
+        `data`. Does not include the constant term (`self.bg_avg`), since
+        that isn't attributable to any feature subset; see `__call__` to
+        reconstruct the full model output including it.
 
         Parameters
         ----------
@@ -205,8 +211,8 @@ class PartialDependenceDecomposition:
         Returns
         -------
         dict of FeatureSubset to numpy.ndarray
-            Each component function's value, as an array of shape
-            (num_rows, num_outputs).
+            Each non-constant component function's value, as an array of
+            shape (num_rows, num_outputs).
         """
         return {
             subset: estimator(self.dataset.extract_columns(subset, data))
@@ -269,22 +275,21 @@ class PartialDependenceDecomposition:
             shape=(data.shape[0], self.dataset.num_features, self.num_outputs)
         )
         for feature_subset, output_vector in pdp_values.items():
-            if len(feature_subset) > 0:
-                component_effect = np.expand_dims(output_vector, axis=1)
-                features = feature_subset.features
-                if partial_ordering is not None:
-                    coef = self._asv_coefficients(
-                        feature_subset, simple_partial_ordering
-                    )
-                    nonzero_features = np.array(features)[coef != 0]
-                    component_effect = np.tile(
-                        component_effect, (1, len(nonzero_features), 1)
-                    )
-                    result[:, nonzero_features, :] += component_effect / coef[
-                        coef != 0
-                    ].reshape(1, -1, 1)
-                else:
-                    result[:, features, :] += component_effect / len(feature_subset)
+            component_effect = np.expand_dims(output_vector, axis=1)
+            features = feature_subset.features
+            if partial_ordering is not None:
+                coef = self._asv_coefficients(
+                    feature_subset, simple_partial_ordering
+                )
+                nonzero_features = np.array(features)[coef != 0]
+                component_effect = np.tile(
+                    component_effect, (1, len(nonzero_features), 1)
+                )
+                result[:, nonzero_features, :] += component_effect / coef[
+                    coef != 0
+                ].reshape(1, -1, 1)
+            else:
+                result[:, features, :] += component_effect / len(feature_subset)
 
         if project:
             # Orthogonal projection of Shapley values onto hyperplane
