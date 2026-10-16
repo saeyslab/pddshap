@@ -10,7 +10,10 @@ structural approximation error) instead of just checking it runs.
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
 
 from pddshap import PartialDependenceDecomposition
 from pddshap.sampling import IndependentConditioningMethod, RandomSubsampleCollocation
@@ -33,8 +36,8 @@ TEST_SIZE = 0.1
 ESTIMATOR_CONFIGS = [
     pytest.param(
         {
-            "estimator_type": "knn",
-            "est_kwargs": {"k": 3},
+            "estimator_type": KNeighborsRegressor,
+            "est_kwargs": {"n_neighbors": 3},
             "r2_threshold": 0.9,
             "pearson_threshold": 0.9,
         },
@@ -42,7 +45,7 @@ ESTIMATOR_CONFIGS = [
     ),
     pytest.param(
         {
-            "estimator_type": "forest",
+            "estimator_type": GradientBoostingRegressor,
             "est_kwargs": {},
             "r2_threshold": 0.9,
             "pearson_threshold": 0.9,
@@ -51,7 +54,7 @@ ESTIMATOR_CONFIGS = [
     ),
     pytest.param(
         {
-            "estimator_type": "tree",
+            "estimator_type": DecisionTreeRegressor,
             "est_kwargs": {},
             "r2_threshold": 0.9,
             "pearson_threshold": 0.9,
@@ -89,8 +92,8 @@ def fitted_decomposition(quadratic_model_and_data, estimator_config):
         model,
         collocation_method=RandomSubsampleCollocation(),
         conditioning_method=IndependentConditioningMethod(X_train.to_numpy()),
-        regressor_type=estimator_config["estimator_type"],
-        regressor_kwargs=estimator_config["est_kwargs"],
+        estimator_type=estimator_config["estimator_type"],
+        estimator_kwargs=estimator_config["est_kwargs"],
     )
     decomposition.fit(X_train, max_size=2)
     return decomposition

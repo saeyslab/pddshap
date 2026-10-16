@@ -3,6 +3,7 @@ import os
 import pathlib
 
 import numpy as np
+from sklearn.neighbors import KNeighborsRegressor
 
 from pddshap import PartialDependenceDecomposition
 from pddshap.datasets import load
@@ -63,8 +64,8 @@ if __name__ == "__main__":
         model=pred_fn,
         collocation_method=RandomSubsampleCollocation(frac=pdd_cfg["collocation_frac"]),
         conditioning_method=IndependentConditioningMethod(X_bg.to_numpy()),
-        regressor_type="knn",
-        regressor_kwargs={"k": 3},
+        estimator_type=KNeighborsRegressor,
+        estimator_kwargs={"n_neighbors": 3},
     )
     pdd.fit(
         split.X_train, X_bg,

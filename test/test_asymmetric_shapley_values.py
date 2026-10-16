@@ -25,14 +25,11 @@ def test_asymmetric_shapley_values_with_partial_ordering(
     # 0's value is just its own main effect, while features 1 and 2 (mutually
     # incomparable) each pick up half of their shared pairwise component on
     # top of their own main effect and interaction with feature 0.
-    components = fitted_decomposition.components
     dataset = fitted_decomposition.dataset
+    pdp_values = fitted_decomposition.evaluate(X_test_np)
 
     def evaluate(*features):
-        feature_subset = dataset.get_subset(*features)
-        return components[feature_subset](
-            dataset.extract_columns(feature_subset, X_test_np)
-        )
+        return pdp_values[dataset.get_subset(*features)]
 
     c0 = evaluate(0)
     c1 = evaluate(1)

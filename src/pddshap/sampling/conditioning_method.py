@@ -22,22 +22,12 @@ class ConditioningMethod:
         self.train_data = self.dataset.data
     
     @abstractmethod
-    def _conditional_expectation(self,
-                                 feature_subset: FeatureSubset, value: npt.NDArray,
-                                 model: Callable[[npt.NDArray], npt.NDArray],
-                                 **kwargs) -> npt.NDArray:
-        raise NotImplementedError
-
     def conditional_expectation(self,
                                  feature_subset: FeatureSubset,
                                  value: npt.NDArray,
                                  model: Callable[[npt.NDArray], npt.NDArray],
                                  **kwargs) -> npt.NDArray:
-        result = self._conditional_expectation(feature_subset, value, model, **kwargs)
-        if len(result.shape) == 1:
-            # If there is only 1 output, the dimension must be added
-            result = np.expand_dims(result, axis=-1)
-        return result
+        raise NotImplementedError
 
 
 class IndependentConditioningMethod(ConditioningMethod):
@@ -47,7 +37,7 @@ class IndependentConditioningMethod(ConditioningMethod):
     the marginal distribution of the other features.
     This corresponds to off-manifold Shapley values.
     """
-    def _conditional_expectation(self,
+    def conditional_expectation(self,
                                  feature_subset: FeatureSubset,
                                  value: npt.NDArray,
                                  model: Callable[[npt.NDArray], npt.NDArray],
@@ -62,7 +52,7 @@ class GaussianConditioningMethod(ConditioningMethod):
         self.mean = np.mean(train_data, axis=0)
         self.num_features = train_data.shape[1]
     
-    def _conditional_expectation(self, feature_subset: FeatureSubset,
+    def conditional_expectation(self, feature_subset: FeatureSubset,
                                  value: npt.NDArray,
                                  model: Callable[[npt.NDArray], npt.NDArray],
                                  num_samples=100, **kwargs) -> npt.NDArray:
@@ -95,7 +85,7 @@ class KernelConditioningMethod(ConditioningMethod):
         self.sigma_sq = sigma_sq
         self.inv_cov = np.linalg.inv(np.cov(train_data, rowvar=False))
     
-    def _conditional_expectation(self, feature_subset: FeatureSubset,
+    def conditional_expectation(self, feature_subset: FeatureSubset,
                                     value: npt.NDArray,
                                     model: Callable[[npt.NDArray], npt.NDArray],
                                     **kwargs) -> npt.NDArray:
@@ -122,13 +112,13 @@ class KernelGaussianConditioningMethod(ConditioningMethod):
         self.gaussian_method = GaussianConditioningMethod(train_data, **kwargs)
         self.threshold = threshold
     
-    def _conditional_expectation(self, feature_subset: FeatureSubset,
+    def conditional_expectation(self, feature_subset: FeatureSubset,
                                  value: npt.NDArray,
                                  model: Callable[[npt.NDArray], npt.NDArray],
                                  **kwargs) -> npt.NDArray:
         if len(feature_subset) < self.threshold:
-            return self.kernel_method._conditional_expectation(feature_subset, value, model, **kwargs)
-        return self.gaussian_method._conditional_expectation(feature_subset, value, model, **kwargs)
+            return self.kernel_method.conditional_expectation(feature_subset, value, model, **kwargs)
+        return self.gaussian_method.conditional_expectation(feature_subset, value, model, **kwargs)
 
 
 class GaussianCopulaConditioningMethod(ConditioningMethod):

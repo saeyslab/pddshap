@@ -1,5 +1,6 @@
 from collections.abc import Collection
 from itertools import combinations
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -7,24 +8,10 @@ from joblib import Parallel, delayed
 from numpy import typing as npt
 from tqdm import tqdm
 
-from .estimator import (
-    GaussianProcessPDDEstimator,
-    GradientBoostingPDDEstimator,
-    KNNPDDEstimator,
-    PDDEstimator,
-    TreePDDEstimator,
-)
 from .sampling import CollocationMethod, ConditioningMethod
 from .signature import Dataset
 from .signature.feature_subset import FeatureSubset
 from .util import Model, SimplePartialOrdering
-
-ESTIMATOR_REGISTRY: dict[str, type[PDDEstimator]] = {
-    "tree": TreePDDEstimator,
-    "forest": GradientBoostingPDDEstimator,
-    "knn": KNNPDDEstimator,
-    "gp": GaussianProcessPDDEstimator,
-}
 
 
 class PartialDependenceDecomposition:
@@ -33,23 +20,44 @@ class PartialDependenceDecomposition:
         model: Model,
         collocation_method: CollocationMethod,
         conditioning_method: ConditioningMethod,
-        regressor_type: str | type[PDDEstimator],
-        regressor_kwargs: dict or None = None,
+        estimator_type: type,
+        estimator_kwargs: dict | None = None,
         use_onehot: bool = False
     ) -> None:
+        """
+        Parameters
+        ----------
+        model : Model
+            The model to approximate with a partial dependence decomposition.
+        collocation_method : CollocationMethod
+            Method used to choose, per feature subset, the coordinates at
+            which partial dependence is evaluated.
+        conditioning_method : ConditioningMethod
+            Method used to compute the conditional/marginal expectation of
+            the model's output at a given coordinate.
+        estimator_type : type
+            Constructor of the estimator used to fit each component, e.g. a
+            scikit-learn regressor class such as `DecisionTreeRegressor`. An
+            instance is built per component as `estimator_type(**estimator_kwargs)`
+            and must provide `fit(X, y)` (fitting in place on two numpy
+            arrays) and `predict(X)` (returning a numpy array), as all
+            scikit-learn estimators do. Any class implementing that
+            interface works, not just scikit-learn estimators.
+        estimator_kwargs : dict, optional
+            Keyword arguments passed to `estimator_type` for every component.
+        use_onehot : bool, default False
+            Whether `Dataset` should one-hot encode categorical features
+            internally.
+        """
         self.model = model
         self.collocation_method = collocation_method
         self.conditioning_method = conditioning_method
-        self.regressor_type = (
-            ESTIMATOR_REGISTRY[regressor_type]
-            if isinstance(regressor_type, str)
-            else regressor_type
-        )
-        self.regressor_kwargs = regressor_kwargs if regressor_kwargs is not None else {}
+        self.estimator_type = estimator_type
+        self.estimator_kwargs = estimator_kwargs if estimator_kwargs is not None else {}
         self.use_onehot = use_onehot
 
         self.dataset: Dataset | None = None
-        self.components: dict[FeatureSubset, PDDEstimator] = {}
+        self.components: dict[FeatureSubset, Any] = {}
         self.bg_avg = None
         self.num_outputs = None
 
@@ -116,7 +124,7 @@ class PartialDependenceDecomposition:
             fs_size += 1
             cur_subsets = [fs for fs in subsets if len(fs) == fs_size]
 
-    def _fit_component(self, feature_set: FeatureSubset) -> PDDEstimator:
+    def _fit_component(self, feature_set: FeatureSubset) -> Any:
         """
         Fit an estimator for `feature_set` against the residual partial
         dependence left after subtracting every already-fitted strict-subset
@@ -158,16 +166,15 @@ class PartialDependenceDecomposition:
         full_width_collocation_points = self.dataset.expand_columns(
             feature_set, collocation_points
         )
-        for subset, regressor in subcomponents.items():
-            partial_dependence -= regressor(
+        for subset, estimator in subcomponents.items():
+            partial_dependence -= estimator.predict(
                 self.dataset.extract_columns(subset, full_width_collocation_points)
             )
 
         # Fit an estimator on the resulting values
-        categories = self.dataset.get_categories(feature_set)
-        regressor = self.regressor_type(categories, feature_set, **self.regressor_kwargs)
-        regressor.fit(collocation_points, partial_dependence)
-        return regressor
+        estimator = self.estimator_type(**self.estimator_kwargs)
+        estimator.fit(collocation_points, partial_dependence)
+        return estimator
 
     def __call__(self, data: pd.DataFrame | npt.NDArray):
         """
@@ -187,7 +194,9 @@ class PartialDependenceDecomposition:
         if isinstance(data, pd.DataFrame):
             data = data.values
         pdp_values = self.evaluate(data)
-        result = np.tile(self.bg_avg, (data.shape[0], 1))
+        result = np.broadcast_to(
+            self.bg_avg, (data.shape[0], *self.bg_avg.shape)
+        ).copy()
         for values in pdp_values.values():
             result += values
         return result
@@ -208,10 +217,11 @@ class PartialDependenceDecomposition:
         -------
         dict of FeatureSubset to numpy.ndarray
             Each non-constant component function's value, as an array of
-            shape (num_rows, num_outputs).
+            shape (num_rows,) for a single-output model, or
+            (num_rows, num_outputs) for a multi-output one.
         """
         return {
-            subset: estimator(self.dataset.extract_columns(subset, data))
+            subset: estimator.predict(self.dataset.extract_columns(subset, data))
             for subset, estimator in self.components.items()
         }
 
@@ -310,7 +320,7 @@ class PartialDependenceDecomposition:
             shape=(data.shape[0], self.dataset.num_features, self.num_outputs)
         )
         for feature_subset, output_vector in pdp_values.items():
-            component_effect = np.expand_dims(output_vector, axis=1)
+            component_effect = output_vector.reshape(-1, 1, self.num_outputs)
             features = feature_subset.features
             if partial_ordering is not None:
                 coef = self._asv_coefficients(
