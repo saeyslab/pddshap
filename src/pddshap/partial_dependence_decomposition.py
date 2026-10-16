@@ -8,7 +8,6 @@ from numpy import typing as npt
 from tqdm import tqdm
 
 from .estimator import (
-    ConstantPDDEstimator,
     GaussianProcessPDDEstimator,
     GradientBoostingPDDEstimator,
     KNNPDDEstimator,
@@ -166,9 +165,6 @@ class PartialDependenceDecomposition:
 
         # Fit an estimator on the resulting values
         categories = self.dataset.get_categories(feature_set)
-        if np.max(partial_dependence) - np.min(partial_dependence) < 1e-3:
-            # If the partial dependence is constant, don't fit an estimator
-            return ConstantPDDEstimator(partial_dependence[0])
         regressor = self.regressor_type(categories, feature_set, **self.regressor_kwargs)
         regressor.fit(collocation_points, partial_dependence)
         return regressor
@@ -218,6 +214,45 @@ class PartialDependenceDecomposition:
             subset: estimator(self.dataset.extract_columns(subset, data))
             for subset, estimator in self.components.items()
         }
+
+    def component_summary(self, data: pd.DataFrame | npt.NDArray) -> pd.DataFrame:
+        """
+        Compute summary statistics of each fitted component's output over
+        `data`, as a quick way to see which feature subsets contribute most
+        to the model's output.
+
+        Parameters
+        ----------
+        data : pandas.DataFrame or numpy.ndarray
+            Input data to evaluate the components on.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per fitted component, indexed by the names of the
+            features in that component's subset, with columns `mean`,
+            `std`, `min`, `max`, `q90`, `q10`.
+        """
+        if isinstance(data, pd.DataFrame):
+            data = data.values
+        pdp_values = self.evaluate(data)
+
+        index = [
+            tuple(self.dataset.feature_names[i] for i in feature_subset.features)
+            for feature_subset in pdp_values
+        ]
+        rows = [
+            {
+                "mean": np.mean(output),
+                "std": np.std(output),
+                "min": np.min(output),
+                "max": np.max(output),
+                "q90": np.quantile(output, 0.9),
+                "q10": np.quantile(output, 0.1),
+            }
+            for output in pdp_values.values()
+        ]
+        return pd.DataFrame(rows, index=index)
 
     def _asv_coefficients(
         self, feature_subset: FeatureSubset, partial_ordering: SimplePartialOrdering
