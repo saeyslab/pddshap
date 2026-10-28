@@ -1,0 +1,25 @@
+random_seed: 42
+n_background: 100
+n_test: 1000
+baseline_methods:
+  - sampling
+  - permutation
+  - kernel
+pdd:
+  max_size: 2
+  collocation_frac: 1.0
+  estimator: knn
+  estimator_kwargs:
+    n_neighbors: 3
+  n_jobs: -1
+datasets:
+  adult:
+    max_depth: 4
+  abalone:
+    max_depth: 4
+  credit:
+    max_depth: 4
+  housing:
+    max_depth: 4
+  superconduct:
+    max_depth: 2
