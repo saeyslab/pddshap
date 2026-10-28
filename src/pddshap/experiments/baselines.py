@@ -2,8 +2,6 @@ import numpy as np
 from numpy import typing as npt
 from shap import KernelExplainer, PermutationExplainer, SamplingExplainer
 
-EXPLAINERS = ["permutation", "kernel", "sampling"]
-
 
 def compute_shapley_values(
     pred_fn, X_bg: npt.NDArray, X: npt.NDArray, explainer: str
@@ -33,8 +31,7 @@ def compute_shapley_values(
     elif explainer == "kernel":
         values = KernelExplainer(pred_fn, X_bg).shap_values(X)
         if isinstance(values, list):
-            return np.stack(values, axis=-1)
-        return np.expand_dims(values, -1)
+            values = np.stack(values, axis=-1)
     elif explainer == "sampling":
         values = SamplingExplainer(pred_fn, X_bg)(X).values
     else:

@@ -5,29 +5,45 @@ import yaml
 
 def _find_experiments_root(start: Path) -> Path:
     for candidate in (start, *start.parents):
-        if (candidate / "config" / "config.yaml").is_file():
+        if (candidate / "config" / "general.yaml").is_file():
             return candidate
     raise FileNotFoundError(
-        f"Could not find an experiments/config/config.yaml above {start}"
+        f"Could not find a config/general.yaml above {start}"
     )
 
 
-def load_experiment_config(experiment_dir: str | Path) -> dict:
+def _load_yaml(path: Path) -> dict:
+    with open(path, "r") as fp:
+        return yaml.safe_load(fp) or {}
+
+
+def load_experiment_config(
+    experiment_dir: str | Path, config_path: str | Path | None = None
+) -> dict:
     """
     Load an experiment's configuration by merging, in increasing order of
-    precedence: the shared `experiments/config/config.yaml`, and (if present
-    and distinct) a `config.yaml` local to `experiment_dir`.
+    precedence: the shared `config/general.yaml`, and (if present) an
+    experiment-specific config. All configuration lives under the root-level
+    `config/` directory; nothing is read from `experiment_dir` itself.
 
-    `experiments/config/datasets.yaml` is attached under the `"datasets"` key
-    rather than merged in, since it's a name -> {data_id, pred_type} mapping
-    rather than scalar settings.
+    `config/datasets.yaml` is a name -> {data_id, pred_type} catalog of every
+    known dataset. If the merged experiment config has its own `"datasets"`
+    key, it's treated as a *selection* from that catalog: a mapping of
+    dataset name -> override dict (e.g. `{max_depth: 4}`), restricting
+    `cfg["datasets"]` to just those names, with each entry's overrides merged
+    on top of the catalog's `{data_id, pred_type}`. Otherwise, `cfg["datasets"]`
+    is the full catalog.
 
     Parameters
     ----------
     experiment_dir : str or pathlib.Path
         Directory of the calling experiment script (typically
-        `Path(__file__).parent`). The shared config root is found by walking
-        up from here.
+        `Path(__file__).parent`), used to derive the experiment's default
+        config filename (`experiment_dir.name`) and to locate the config
+        root by walking up from here.
+    config_path : str or pathlib.Path, optional
+        Path to the experiment-specific config file, overriding the default
+        `config/<experiment_dir.name>.yaml`. Must exist if given.
 
     Returns
     -------
@@ -37,15 +53,28 @@ def load_experiment_config(experiment_dir: str | Path) -> dict:
     experiment_dir = Path(experiment_dir)
     root = _find_experiments_root(experiment_dir)
 
-    with open(root / "config" / "config.yaml", "r") as fp:
-        cfg = yaml.safe_load(fp) or {}
-    with open(root / "config" / "datasets.yaml", "r") as fp:
-        datasets_cfg = yaml.safe_load(fp) or {}
+    cfg = _load_yaml(root / "config" / "general.yaml")
+    datasets_cfg = _load_yaml(root / "config" / "datasets.yaml")
 
-    own_config = experiment_dir / "config.yaml"
-    if own_config.is_file() and own_config.resolve() != (root / "config" / "config.yaml").resolve():
-        with open(own_config, "r") as fp:
-            cfg.update(yaml.safe_load(fp) or {})
+    own_config_path = (
+        Path(config_path)
+        if config_path is not None
+        else root / "config" / f"{experiment_dir.name}.yaml"
+    )
+    if config_path is not None and not own_config_path.is_file():
+        raise FileNotFoundError(f"Experiment config not found: {own_config_path}")
 
-    cfg["datasets"] = datasets_cfg
+    own_dataset_overrides = None
+    if own_config_path.is_file():
+        own_cfg = _load_yaml(own_config_path)
+        own_dataset_overrides = own_cfg.pop("datasets", None)
+        cfg.update(own_cfg)
+
+    if own_dataset_overrides is not None:
+        cfg["datasets"] = {
+            name: {**datasets_cfg.get(name, {}), **overrides}
+            for name, overrides in own_dataset_overrides.items()
+        }
+    else:
+        cfg["datasets"] = datasets_cfg
     return cfg

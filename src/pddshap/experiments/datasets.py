@@ -52,7 +52,7 @@ def load_dataset(
         The train/test feature and label arrays, along with the inferred prediction
         type (``"regression"`` or ``"classification"``).
     """
-    ds_dir = os.path.join(data_dir, openml_data_id)
+    ds_dir = os.path.join(data_dir, str(openml_data_id))
 
     # If the dataset is not found under the ``data_dir``,
     # or if it is found but the test size or random state are different,
@@ -61,8 +61,9 @@ def load_dataset(
     needs_fetch = True
     if os.path.isfile(meta_json_path):
         with open(meta_json_path, "r") as fp:
-            meta_test_size = fp.get("test_size")
-            meta_random_state = fp.get("train_test_split_random_state")
+            meta = json.load(fp)
+        meta_test_size = meta.get("test_size")
+        meta_random_state = meta.get("train_test_split_random_state")
         if meta_test_size == test_size and meta_random_state == train_test_split_random_state:
             needs_fetch = False
 
@@ -127,7 +128,7 @@ def load_dataset(
     meta_json_path = os.path.join(ds_dir, "meta.json")
     assert os.path.isfile(meta_json_path), "meta.json file missing"
     with open(meta_json_path, "r") as fp:
-        pred_type = fp.get("pred_type")
+        pred_type = json.load(fp).get("pred_type")
         assert pred_type in ("regression", "classification"), f"Invalid pred_type: {pred_type}"
 
     X_train = pd.read_csv(os.path.join(ds_dir, "X_train.csv"))
