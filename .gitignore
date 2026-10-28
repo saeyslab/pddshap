@@ -169,6 +169,10 @@ pip-selfcheck.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,virtualenv
 
+# The [Ss]cripts rule above is meant for a venv's Scripts/ dir, but it has no
+# leading slash so it also matches the project's own top-level scripts/.
+!/scripts/
+
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode
